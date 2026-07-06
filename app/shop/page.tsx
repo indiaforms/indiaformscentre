@@ -17,40 +17,58 @@ export default async function ShopPage({
   return (
     <>
       <Navbar />
-      <section className="container-px py-16">
-        <h1 className="section-title">Shop</h1>
+      <section className="bg-cream py-16 min-h-screen">
+        <div className="container-px max-w-7xl mx-auto space-y-12">
+          {/* Header */}
+          <div className="space-y-4">
+            <h1 className="text-4xl md:text-5xl font-light tracking-tight text-ink">Corporate Catalogue</h1>
+            <p className="text-sm text-neutral-500 max-w-lg leading-relaxed">
+              Explore our range of customizable, functional merchandise built for branding. Select a category below to filter our collections.
+            </p>
+          </div>
 
-        <div className="flex flex-wrap gap-3 mb-12">
-          <Link
-            href="/shop"
-            className={`px-4 py-2 rounded-full text-xs uppercase tracking-wide border ${
-              !searchParams.category ? "bg-ink text-white border-ink" : "border-black/20"
-            }`}
-          >
-            All
-          </Link>
-          {categories.map((c) => (
+          {/* Categories Grid Filter */}
+          <div className="flex flex-wrap gap-2.5">
             <Link
-              key={c.id}
-              href={`/shop?category=${c.slug}`}
-              className={`px-4 py-2 rounded-full text-xs uppercase tracking-wide border ${
-                searchParams.category === c.slug ? "bg-ink text-white border-ink" : "border-black/20"
+              href="/shop"
+              className={`px-5 py-2.5 rounded-full text-xs font-semibold tracking-wider uppercase border transition-all ${
+                !searchParams.category
+                  ? "bg-ink text-white border-ink shadow-sm"
+                  : "bg-white text-neutral-600 border-neutral-200 hover:border-neutral-400"
               }`}
             >
-              {c.name}
+              All Products
             </Link>
-          ))}
-        </div>
-
-        {products.length === 0 ? (
-          <p className="text-neutral-400">No products found in this category.</p>
-        ) : (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-12">
-            {products.map((p) => (
-              <ProductCard key={p.id} product={p} />
+            {categories.map((c) => (
+              <Link
+                key={c.id}
+                href={`/shop?category=${c.slug}`}
+                className={`px-5 py-2.5 rounded-full text-xs font-semibold tracking-wider uppercase border transition-all ${
+                  searchParams.category === c.slug
+                    ? "bg-ink text-white border-ink shadow-sm"
+                    : "bg-white text-neutral-600 border-neutral-200 hover:border-neutral-400"
+                }`}
+              >
+                {c.name}
+              </Link>
             ))}
           </div>
-        )}
+
+          {/* Product Listing */}
+          {products.length === 0 ? (
+            <div className="bg-white rounded-2xl p-16 text-center text-neutral-400 shadow-sm border border-neutral-100">
+              No products found in this category.
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-12">
+              {products.map((p) => (
+                <div key={p.id} className="animate-fade-in">
+                  <ProductCard product={p} />
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </section>
       <Footer />
     </>

@@ -9,36 +9,123 @@ import {
   adminUpdateProduct,
   adminDeleteProduct,
   adminCreateCategory,
+  adminGetEnquiries,
+  adminUpdateEnquiryStatus,
+  adminGetAnalytics,
+  adminGetUsers,
+  adminCreateUser,
+  adminDeleteUser,
   type Product,
   type Category,
+  type Enquiry,
+  type User,
+  type Analytics,
 } from "@/lib/api";
+import { 
+  Package, 
+  Users, 
+  Layers, 
+  MessageSquare, 
+  BarChart3, 
+  LogOut, 
+  Plus, 
+  Search, 
+  Eye, 
+  EyeOff, 
+  Trash2, 
+  Edit3, 
+  Download, 
+  UserPlus, 
+  TrendingUp, 
+  AlertTriangle, 
+  Smartphone, 
+  Clock, 
+  CheckCircle,
+  XCircle,
+  TrendingDown,
+  Image as ImageIcon
+} from "lucide-react";
 
-const emptyForm = {
+type FormState = {
+  name: string;
+  description: string;
+  price: number;
+  image_url: string;
+  quantity: number;
+  is_visible: boolean;
+  category_id: string | number;
+};
+
+const emptyForm: FormState = {
   name: "",
   description: "",
   price: 0,
   image_url: "",
   quantity: 0,
   is_visible: true,
-  category_id: "" as string | number,
+  category_id: "",
 };
 
 export default function AdminDashboard() {
   const router = useRouter();
+  
+  // Tab states: 'overview' | 'inventory' | 'enquiries' | 'categories' | 'team'
+  const [activeTab, setActiveTab] = useState<string>("overview");
+  
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [form, setForm] = useState(emptyForm);
+  const [enquiries, setEnquiries] = useState<Enquiry[]>([]);
+  const [teamUsers, setTeamUsers] = useState<User[]>([]);
+  const [analytics, setAnalytics] = useState<Analytics | null>(null);
+  
+  const [userRole, setUserRole] = useState<string>("employee");
+  const [currentUser, setCurrentUser] = useState<string>("");
+  
+  const [form, setForm] = useState<FormState>(emptyForm);
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [showProductForm, setShowProductForm] = useState(false);
   const [newCategory, setNewCategory] = useState("");
-  const [error, setError] = useState("");
+  
+  // Team creation states
+  const [newUsername, setNewUsername] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [newRole, setNewRole] = useState("employee");
+  
+  // Search & Filter states
+  const [searchQuery, setSearchQuery] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("");
+  const [enquirySearchQuery, setEnquirySearchQuery] = useState("");
+  const [enquiryStatusFilter, setEnquiryStatusFilter] = useState("");
 
-  async function loadAll() {
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+
+  // Load everything
+  async function loadData() {
     try {
-      const [p, c] = await Promise.all([adminGetProducts(), adminGetCategories()]);
+      const role = localStorage.getItem("user_role") || "employee";
+      const user = localStorage.getItem("username") || "";
+      setUserRole(role);
+      setCurrentUser(user);
+
+      const [p, c, e, a] = await Promise.all([
+        adminGetProducts(),
+        adminGetCategories(),
+        adminGetEnquiries().catch(() => []),
+        adminGetAnalytics().catch(() => null)
+      ]);
+      
       setProducts(p);
       setCategories(c);
+      setEnquiries(e);
+      setAnalytics(a);
+
+      if (role === "admin") {
+        const u = await adminGetUsers().catch(() => []);
+        setTeamUsers(u);
+      }
     } catch (err: any) {
-      setError(err.message || "Failed to load data");
+      setError(err.message || "Failed to sync dashboard data.");
       if (String(err.message).includes("authenticated") || String(err.message).includes("token")) {
         router.push("/admin/login");
       }
@@ -50,38 +137,52 @@ export default function AdminDashboard() {
       router.push("/admin/login");
       return;
     }
-    loadAll();
+    loadData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function logout() {
     localStorage.removeItem("admin_token");
+    localStorage.removeItem("user_role");
+    localStorage.removeItem("username");
     router.push("/admin/login");
   }
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  // Clear alerts
+  function clearAlerts() {
     setError("");
+    setSuccess("");
+  }
+
+  // Handle Product Save (Add/Update)
+  async function handleProductSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    clearAlerts();
     const payload = {
       ...form,
       price: Number(form.price),
       quantity: Number(form.quantity),
       category_id: form.category_id ? Number(form.category_id) : null,
     };
+
     try {
       if (editingId) {
         await adminUpdateProduct(editingId, payload);
+        setSuccess("Product updated successfully.");
       } else {
         await adminCreateProduct(payload);
+        setSuccess("New product added to inventory.");
       }
       setForm(emptyForm);
       setEditingId(null);
-      loadAll();
+      setShowProductForm(false);
+      loadData();
     } catch (err: any) {
-      setError(err.message || "Save failed");
+      setError(err.message || "Failed to save product.");
     }
   }
 
+  // Trigger editing product
   function startEdit(p: Product) {
     setEditingId(p.id);
     setForm({
@@ -93,196 +194,997 @@ export default function AdminDashboard() {
       is_visible: p.is_visible,
       category_id: p.category?.id || "",
     });
+    setShowProductForm(true);
   }
 
+  // Toggle Visibility
   async function toggleVisible(p: Product) {
-    await adminUpdateProduct(p.id, { is_visible: !p.is_visible });
-    loadAll();
+    clearAlerts();
+    try {
+      await adminUpdateProduct(p.id, { is_visible: !p.is_visible });
+      loadData();
+    } catch (err: any) {
+      setError(err.message || "Failed to update visibility.");
+    }
   }
 
+  // Quick adjust quantity
   async function quickSetQuantity(p: Product, qty: number) {
-    await adminUpdateProduct(p.id, { quantity: Math.max(0, qty) });
-    loadAll();
+    clearAlerts();
+    try {
+      await adminUpdateProduct(p.id, { quantity: Math.max(0, qty) });
+      loadData();
+    } catch (err: any) {
+      setError(err.message || "Failed to update quantity.");
+    }
   }
 
-  async function handleDelete(id: number) {
-    if (!confirm("Delete this product?")) return;
-    await adminDeleteProduct(id);
-    loadAll();
+  // Delete product (Admin only)
+  async function handleDeleteProduct(id: number) {
+    if (userRole !== "admin") {
+      setError("Only administrators can delete products.");
+      return;
+    }
+    if (!confirm("Are you sure you want to permanently delete this product?")) return;
+    clearAlerts();
+    try {
+      await adminDeleteProduct(id);
+      setSuccess("Product deleted successfully.");
+      loadData();
+    } catch (err: any) {
+      setError(err.message || "Delete failed.");
+    }
   }
 
+  // Add Category
   async function handleAddCategory(e: React.FormEvent) {
     e.preventDefault();
     if (!newCategory.trim()) return;
-    await adminCreateCategory(newCategory.trim());
-    setNewCategory("");
-    loadAll();
+    clearAlerts();
+    try {
+      await adminCreateCategory(newCategory.trim());
+      setSuccess(`Category "${newCategory.trim()}" created.`);
+      setNewCategory("");
+      loadData();
+    } catch (err: any) {
+      setError(err.message || "Failed to create category.");
+    }
   }
 
+  // Update Enquiry Status
+  async function handleEnquiryStatusChange(id: number, newStatus: string) {
+    clearAlerts();
+    try {
+      await adminUpdateEnquiryStatus(id, newStatus);
+      setSuccess("Enquiry status updated.");
+      loadData();
+    } catch (err: any) {
+      setError(err.message || "Failed to update status.");
+    }
+  }
+
+  // Create Team User (Admin only)
+  async function handleCreateUser(e: React.FormEvent) {
+    e.preventDefault();
+    if (!newUsername.trim() || !newPassword.trim()) return;
+    clearAlerts();
+    try {
+      await adminCreateUser({
+        username: newUsername.trim(),
+        password: newPassword.trim(),
+        role: newRole,
+      });
+      setSuccess(`User Account for "${newUsername.trim()}" created successfully.`);
+      setNewUsername("");
+      setNewPassword("");
+      loadData();
+    } catch (err: any) {
+      setError(err.message || "Failed to create user account.");
+    }
+  }
+
+  // Delete Team User (Admin only)
+  async function handleDeleteUser(id: number) {
+    if (confirm("Delete this user account?")) {
+      clearAlerts();
+      try {
+        await adminDeleteUser(id);
+        setSuccess("User account removed.");
+        loadData();
+      } catch (err: any) {
+        setError(err.message || "Failed to delete user.");
+      }
+    }
+  }
+
+  // Export Inventory to CSV
+  const handleExportCSV = () => {
+    const headers = ["Product ID", "Name", "Slug", "Category", "Price (INR)", "Quantity", "Status", "Visible"];
+    const rows = products.map((p) => [
+      p.id,
+      `"${p.name.replace(/"/g, '""')}"`,
+      p.slug,
+      p.category?.name || "—",
+      p.price,
+      p.quantity,
+      p.stock_status === "out_of_stock" ? "Sold Out" : "In Stock",
+      p.is_visible ? "Yes" : "No",
+    ]);
+
+    const csvContent =
+      "data:text/csv;charset=utf-8," +
+      [headers.join(","), ...rows.map((e) => e.join(","))].join("\n");
+
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `fuzo_inventory_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // WhatsApp Connect Helper
+  const launchWhatsApp = (enq: Enquiry) => {
+    const clientPhone = enq.phone.replace(/[^0-9+]/g, ""); // Keep number clean
+    const cleanedPhone = clientPhone.startsWith("+") ? clientPhone.substring(1) : clientPhone;
+    
+    // Add default India country code if length is 10 digits
+    const destination = cleanedPhone.length === 10 ? `91${cleanedPhone}` : cleanedPhone;
+    
+    const text = `Hi ${enq.name}, thanking you for reaching out to FUZO Centre.\n` +
+      `We received your enquiry regarding corporate gifting (Ref: #${enq.id}).\n` +
+      `Our representative is here to help customize your kits. Could you share your logo design?`;
+      
+    const url = `https://wa.me/${destination}?text=${encodeURIComponent(text)}`;
+    window.open(url, "_blank", "noopener,noreferrer");
+  };
+
+  // Filter products
+  const filteredProducts = products.filter((p) => {
+    const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                          p.description.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesCategory = categoryFilter === "" || p.category?.id.toString() === categoryFilter;
+    return matchesSearch && matchesCategory;
+  });
+
+  // Filter enquiries
+  const filteredEnquiries = enquiries.filter((e) => {
+    const matchesSearch = e.name.toLowerCase().includes(enquirySearchQuery.toLowerCase()) || 
+                          (e.company && e.company.toLowerCase().includes(enquirySearchQuery.toLowerCase())) ||
+                          e.phone.includes(enquirySearchQuery) || 
+                          e.message.toLowerCase().includes(enquirySearchQuery.toLowerCase());
+    const matchesStatus = enquiryStatusFilter === "" || e.status === enquiryStatusFilter;
+    return matchesSearch && matchesStatus;
+  });
+
   return (
-    <div className="min-h-screen bg-cream">
-      <header className="flex items-center justify-between container-px h-20 border-b border-black/5">
-        <h1 className="text-lg tracking-widest uppercase">Admin Dashboard</h1>
-        <button onClick={logout} className="text-sm uppercase tracking-wide hover:opacity-60">
-          Log out
-        </button>
+    <div className="min-h-screen bg-neutral-50 flex flex-col font-sans">
+      
+      {/* Top Banner Header */}
+      <header className="bg-white border-b border-neutral-200/80 sticky top-0 z-30 shadow-sm">
+        <div className="container-px max-w-7xl mx-auto h-20 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-ink flex items-center justify-center text-white font-bold text-lg">
+              F
+            </div>
+            <div>
+              <h1 className="text-sm font-bold uppercase tracking-wider text-ink">FUZO Centre Portal</h1>
+              <p className="text-[10px] text-neutral-400 uppercase tracking-widest font-semibold">
+                Logged in as: <span className="text-ink font-bold">{currentUser}</span> ({userRole})
+              </p>
+            </div>
+          </div>
+          
+          <button 
+            onClick={logout} 
+            className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-neutral-500 hover:text-red-600 transition-colors bg-neutral-100 hover:bg-red-50 px-4 py-2 rounded-full"
+          >
+            <LogOut size={13} />
+            Log Out
+          </button>
+        </div>
       </header>
 
-      <main className="container-px py-12 grid grid-cols-1 lg:grid-cols-3 gap-10">
-        {/* Product form */}
-        <section className="bg-white rounded-2xl p-8 h-fit">
-          <h2 className="text-sm uppercase tracking-wide mb-6">
-            {editingId ? "Edit Product" : "Add Product"}
-          </h2>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <input
-              className="w-full border border-black/10 rounded-lg px-4 py-2 text-sm"
-              placeholder="Product name"
-              value={form.name}
-              onChange={(e) => setForm({ ...form, name: e.target.value })}
-              required
-            />
-            <textarea
-              className="w-full border border-black/10 rounded-lg px-4 py-2 text-sm"
-              placeholder="Description"
-              value={form.description}
-              onChange={(e) => setForm({ ...form, description: e.target.value })}
-              rows={3}
-            />
-            <input
-              className="w-full border border-black/10 rounded-lg px-4 py-2 text-sm"
-              placeholder="Image URL"
-              value={form.image_url}
-              onChange={(e) => setForm({ ...form, image_url: e.target.value })}
-            />
-            <div className="grid grid-cols-2 gap-4">
-              <input
-                type="number"
-                min={0}
-                step="0.01"
-                className="w-full border border-black/10 rounded-lg px-4 py-2 text-sm"
-                placeholder="Price"
-                value={form.price}
-                onChange={(e) => setForm({ ...form, price: Number(e.target.value) })}
-                required
-              />
-              <input
-                type="number"
-                min={0}
-                className="w-full border border-black/10 rounded-lg px-4 py-2 text-sm"
-                placeholder="Quantity in stock"
-                value={form.quantity}
-                onChange={(e) => setForm({ ...form, quantity: Number(e.target.value) })}
-                required
-              />
-            </div>
-            <select
-              className="w-full border border-black/10 rounded-lg px-4 py-2 text-sm"
-              value={form.category_id}
-              onChange={(e) => setForm({ ...form, category_id: e.target.value })}
+      <div className="flex-1 flex flex-col lg:flex-row container-px max-w-7xl mx-auto py-8 gap-8 w-full">
+        
+        {/* Left Sidebar Navigation */}
+        <aside className="w-full lg:w-64 flex flex-row lg:flex-col gap-2 overflow-x-auto lg:overflow-x-visible pb-3 lg:pb-0 h-fit">
+          <button
+            onClick={() => { setActiveTab("overview"); clearAlerts(); }}
+            className={`flex items-center gap-2.5 px-5 py-3.5 rounded-xl text-xs font-bold uppercase tracking-wider whitespace-nowrap transition-all w-full text-left ${
+              activeTab === "overview"
+                ? "bg-ink text-white shadow-md shadow-neutral-900/10"
+                : "bg-white text-neutral-600 border border-neutral-200/50 hover:bg-neutral-100/50"
+            }`}
+          >
+            <BarChart3 size={15} />
+            Overview
+          </button>
+          
+          <button
+            onClick={() => { setActiveTab("inventory"); clearAlerts(); }}
+            className={`flex items-center gap-2.5 px-5 py-3.5 rounded-xl text-xs font-bold uppercase tracking-wider whitespace-nowrap transition-all w-full text-left ${
+              activeTab === "inventory"
+                ? "bg-ink text-white shadow-md shadow-neutral-900/10"
+                : "bg-white text-neutral-600 border border-neutral-200/50 hover:bg-neutral-100/50"
+            }`}
+          >
+            <Package size={15} />
+            Inventory
+          </button>
+          
+          <button
+            onClick={() => { setActiveTab("enquiries"); clearAlerts(); }}
+            className={`flex items-center gap-2.5 px-5 py-3.5 rounded-xl text-xs font-bold uppercase tracking-wider whitespace-nowrap transition-all w-full text-left relative ${
+              activeTab === "enquiries"
+                ? "bg-ink text-white shadow-md shadow-neutral-900/10"
+                : "bg-white text-neutral-600 border border-neutral-200/50 hover:bg-neutral-100/50"
+            }`}
+          >
+            <MessageSquare size={15} />
+            Enquiries
+            {enquiries.filter(e => e.status === "new").length > 0 && (
+              <span className="absolute top-1/2 right-4 -translate-y-1/2 bg-red-500 text-white font-bold text-[9px] w-5 h-5 rounded-full flex items-center justify-center shadow-sm">
+                {enquiries.filter(e => e.status === "new").length}
+              </span>
+            )}
+          </button>
+          
+          <button
+            onClick={() => { setActiveTab("categories"); clearAlerts(); }}
+            className={`flex items-center gap-2.5 px-5 py-3.5 rounded-xl text-xs font-bold uppercase tracking-wider whitespace-nowrap transition-all w-full text-left ${
+              activeTab === "categories"
+                ? "bg-ink text-white shadow-md shadow-neutral-900/10"
+                : "bg-white text-neutral-600 border border-neutral-200/50 hover:bg-neutral-100/50"
+            }`}
+          >
+            <Layers size={15} />
+            Categories
+          </button>
+
+          {userRole === "admin" && (
+            <button
+              onClick={() => { setActiveTab("team"); clearAlerts(); }}
+              className={`flex items-center gap-2.5 px-5 py-3.5 rounded-xl text-xs font-bold uppercase tracking-wider whitespace-nowrap transition-all w-full text-left ${
+                activeTab === "team"
+                  ? "bg-ink text-white shadow-md shadow-neutral-900/10"
+                  : "bg-white text-neutral-600 border border-neutral-200/50 hover:bg-neutral-100/50"
+              }`}
             >
-              <option value="">No category</option>
-              {categories.map((c) => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-            </select>
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={form.is_visible}
-                onChange={(e) => setForm({ ...form, is_visible: e.target.checked })}
-              />
-              Publicly visible on website
-            </label>
+              <Users size={15} />
+              Team Management
+            </button>
+          )}
+        </aside>
 
-            {error && <p className="text-red-500 text-sm">{error}</p>}
-
-            <div className="flex gap-3 pt-2">
-              <button className="btn-primary flex-1">{editingId ? "Save Changes" : "Add Product"}</button>
-              {editingId && (
-                <button
-                  type="button"
-                  className="btn-outline"
-                  onClick={() => { setEditingId(null); setForm(emptyForm); }}
-                >
-                  Cancel
-                </button>
-              )}
+        {/* Right Dashboard Workspace */}
+        <main className="flex-1 space-y-6 min-w-0">
+          
+          {/* Status Alerts */}
+          {error && (
+            <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-center gap-3 text-red-700 text-sm animate-fade-in">
+              <AlertTriangle size={18} className="flex-shrink-0 text-red-500" />
+              <span>{error}</span>
             </div>
-          </form>
+          )}
+          {success && (
+            <div className="bg-green-50 border border-green-200 rounded-xl p-4 flex items-center gap-3 text-green-700 text-sm animate-fade-in">
+              <CheckCircle size={18} className="flex-shrink-0 text-green-500" />
+              <span>{success}</span>
+            </div>
+          )}
 
-          <div className="mt-10 pt-6 border-t border-black/5">
-            <h3 className="text-sm uppercase tracking-wide mb-3">Add Category</h3>
-            <form onSubmit={handleAddCategory} className="flex gap-2">
-              <input
-                className="flex-1 border border-black/10 rounded-lg px-4 py-2 text-sm"
-                placeholder="Category name"
-                value={newCategory}
-                onChange={(e) => setNewCategory(e.target.value)}
-              />
-              <button className="btn-outline">Add</button>
-            </form>
-          </div>
-        </section>
+          {/* ==================== TAB: OVERVIEW ==================== */}
+          {activeTab === "overview" && (
+            <div className="space-y-6">
+              
+              {/* Analytics Summary Cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+                <div className="bg-white border border-neutral-200/75 rounded-2xl p-6 flex items-center justify-between shadow-sm">
+                  <div className="space-y-2">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">Total Products</span>
+                    <h3 className="text-3xl font-semibold text-ink">{analytics?.total_products || products.length}</h3>
+                  </div>
+                  <div className="w-12 h-12 bg-neutral-50 text-ink border border-neutral-100 rounded-xl flex items-center justify-center">
+                    <Package size={22} />
+                  </div>
+                </div>
 
-        {/* Product table */}
-        <section className="lg:col-span-2 bg-white rounded-2xl p-8 overflow-x-auto">
-          <h2 className="text-sm uppercase tracking-wide mb-6">Inventory ({products.length})</h2>
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left text-neutral-400 border-b border-black/5">
-                <th className="py-2 pr-4">Product</th>
-                <th className="py-2 pr-4">Category</th>
-                <th className="py-2 pr-4">Price</th>
-                <th className="py-2 pr-4">Qty</th>
-                <th className="py-2 pr-4">Status</th>
-                <th className="py-2 pr-4">Visible</th>
-                <th className="py-2 pr-4"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {products.map((p) => (
-                <tr key={p.id} className="border-b border-black/5">
-                  <td className="py-3 pr-4">{p.name}</td>
-                  <td className="py-3 pr-4 text-neutral-500">{p.category?.name || "—"}</td>
-                  <td className="py-3 pr-4">₹{p.price}</td>
-                  <td className="py-3 pr-4">
+                <div className="bg-white border border-neutral-200/75 rounded-2xl p-6 flex items-center justify-between shadow-sm">
+                  <div className="space-y-2">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">Enquiries (All)</span>
+                    <h3 className="text-3xl font-semibold text-ink">{analytics?.total_enquiries || enquiries.length}</h3>
+                  </div>
+                  <div className="w-12 h-12 bg-neutral-50 text-ink border border-neutral-100 rounded-xl flex items-center justify-center">
+                    <MessageSquare size={22} />
+                  </div>
+                </div>
+
+                <div className="bg-white border border-neutral-200/75 rounded-2xl p-6 flex items-center justify-between shadow-sm">
+                  <div className="space-y-2">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">Out of Stock Alerts</span>
+                    <h3 className={`text-3xl font-semibold ${analytics?.out_of_stock && analytics.out_of_stock > 0 ? "text-red-500 font-bold" : "text-ink"}`}>
+                      {analytics?.out_of_stock || products.filter(p => p.quantity <= 0).length}
+                    </h3>
+                  </div>
+                  <div className="w-12 h-12 bg-neutral-50 text-ink border border-neutral-100 rounded-xl flex items-center justify-center">
+                    <AlertTriangle size={22} className={analytics?.out_of_stock && analytics.out_of_stock > 0 ? "text-red-500 animate-pulse" : "text-ink"} />
+                  </div>
+                </div>
+
+                <div className="bg-white border border-neutral-200/75 rounded-2xl p-6 flex items-center justify-between shadow-sm">
+                  <div className="space-y-2">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">Total Stock Qty</span>
+                    <h3 className="text-3xl font-semibold text-ink">{analytics?.total_stock_qty || products.reduce((acc, curr) => acc + curr.quantity, 0)}</h3>
+                  </div>
+                  <div className="w-12 h-12 bg-neutral-50 text-ink border border-neutral-100 rounded-xl flex items-center justify-center">
+                    <TrendingUp size={22} />
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                
+                {/* Bar Chart - Enquiries Trend */}
+                <div className="lg:col-span-2 bg-white border border-neutral-200/75 rounded-2xl p-6 shadow-sm space-y-6">
+                  <h3 className="text-xs font-bold uppercase tracking-widest text-neutral-400 flex items-center gap-1.5">
+                    <TrendingUp size={14} /> Enquiries Trend (Last 7 Days)
+                  </h3>
+                  
+                  {analytics?.enquiries_trend && analytics.enquiries_trend.length > 0 ? (
+                    <div className="h-56 flex items-end justify-between gap-4 pt-4 px-2">
+                      {analytics.enquiries_trend.map((day, idx) => {
+                        const maxVal = Math.max(...analytics.enquiries_trend.map(d => d.count), 1);
+                        const pct = (day.count / maxVal) * 80; // keep headroom
+                        return (
+                          <div key={idx} className="flex-1 flex flex-col items-center gap-3 group h-full justify-end">
+                            <div className="text-[10px] font-bold text-neutral-500 opacity-0 group-hover:opacity-100 transition-opacity">
+                              {day.count}
+                            </div>
+                            <div 
+                              className="w-full bg-neutral-100 hover:bg-ink rounded-lg transition-all duration-300 relative"
+                              style={{ height: `${pct}%`, minHeight: day.count > 0 ? "8px" : "2px" }}
+                            />
+                            <span className="text-[9px] font-bold uppercase text-neutral-400 select-none">
+                              {day.date}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="h-56 flex items-center justify-center text-xs text-neutral-400 italic">
+                      Insufficient trend analytics.
+                    </div>
+                  )}
+                </div>
+
+                {/* Categories share list */}
+                <div className="bg-white border border-neutral-200/75 rounded-2xl p-6 shadow-sm flex flex-col justify-between">
+                  <div className="space-y-4">
+                    <h3 className="text-xs font-bold uppercase tracking-widest text-neutral-400 flex items-center gap-1.5">
+                      <Layers size={14} /> Catalogues Share
+                    </h3>
+                    <div className="space-y-3 pt-2">
+                      {analytics?.categories_breakdown && Object.keys(analytics.categories_breakdown).length > 0 ? (
+                        Object.entries(analytics.categories_breakdown).map(([cat, count], idx) => {
+                          const total = Object.values(analytics.categories_breakdown).reduce((a, b) => a + b, 0);
+                          const sharePct = total > 0 ? (count / total) * 100 : 0;
+                          return (
+                            <div key={idx} className="space-y-1">
+                              <div className="flex justify-between text-xs">
+                                <span className="font-semibold text-neutral-700">{cat}</span>
+                                <span className="text-neutral-400">{count} products ({sharePct.toFixed(0)}%)</span>
+                              </div>
+                              <div className="w-full h-1.5 bg-neutral-100 rounded-full overflow-hidden">
+                                <div className="h-full bg-ink rounded-full" style={{ width: `${sharePct}%` }} />
+                              </div>
+                            </div>
+                          );
+                        })
+                      ) : (
+                        <p className="text-xs text-neutral-400 italic">No category share data.</p>
+                      )}
+                    </div>
+                  </div>
+
+                  <button 
+                    onClick={() => setActiveTab("inventory")}
+                    className="w-full text-center text-xs font-bold uppercase tracking-wider text-neutral-500 hover:text-ink pt-4 border-t border-neutral-100 mt-4 block"
+                  >
+                    View Catalogues
+                  </button>
+                </div>
+              </div>
+
+              {/* Status Alert Grid */}
+              <div className="bg-white border border-neutral-200/75 rounded-2xl p-6 shadow-sm">
+                <h3 className="text-xs font-bold uppercase tracking-widest text-neutral-400 mb-4 flex items-center gap-1.5">
+                  <AlertTriangle size={14} /> Inventory Alerts
+                </h3>
+                <div className="max-h-60 overflow-y-auto space-y-2">
+                  {products.filter(p => p.quantity <= 3).length === 0 ? (
+                    <p className="text-xs text-neutral-400 italic py-2">All product stocks are at healthy quantities.</p>
+                  ) : (
+                    products.filter(p => p.quantity <= 3).map((p) => (
+                      <div key={p.id} className="flex items-center justify-between py-2.5 px-4 rounded-xl border border-neutral-100 bg-neutral-50">
+                        <div className="flex items-center gap-2">
+                          <div className={`w-2.5 h-2.5 rounded-full ${p.quantity === 0 ? "bg-red-500 animate-pulse" : "bg-amber-500"}`} />
+                          <span className="text-xs font-semibold text-neutral-700">{p.name}</span>
+                          <span className="text-[10px] bg-neutral-200/70 text-neutral-500 px-2 py-0.5 rounded-md uppercase tracking-wider">
+                            {p.category?.name || "No Category"}
+                          </span>
+                        </div>
+                        <span className="text-xs font-bold text-ink bg-white border border-neutral-200/60 px-3 py-1 rounded-lg">
+                          {p.quantity === 0 ? "SOLD OUT" : `${p.quantity} Left`}
+                        </span>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+            </div>
+          )}
+
+          {/* ==================== TAB: INVENTORY ==================== */}
+          {activeTab === "inventory" && (
+            <div className="space-y-6">
+              
+              {/* Header Actions */}
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div className="flex flex-1 items-center gap-3 w-full sm:w-auto">
+                  <div className="relative flex-1 max-w-sm">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" size={16} />
                     <input
-                      type="number"
-                      min={0}
-                      className="w-20 border border-black/10 rounded px-2 py-1"
-                      value={p.quantity}
-                      onChange={(e) => quickSetQuantity(p, Number(e.target.value))}
+                      type="text"
+                      className="w-full bg-white border border-neutral-200 rounded-xl pl-9 pr-4 py-2.5 text-xs text-ink outline-none focus:border-ink"
+                      placeholder="Search inventory..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
                     />
-                  </td>
-                  <td className="py-3 pr-4">
-                    <span
-                      className={`text-xs px-2 py-1 rounded-full ${
-                        p.stock_status === "out_of_stock"
-                          ? "bg-red-100 text-red-600"
-                          : "bg-green-100 text-green-700"
+                  </div>
+                  <select
+                    className="bg-white border border-neutral-200 rounded-xl px-3 py-2.5 text-xs text-neutral-600 outline-none focus:border-ink"
+                    value={categoryFilter}
+                    onChange={(e) => setCategoryFilter(e.target.value)}
+                  >
+                    <option value="">All Categories</option>
+                    {categories.map((c) => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
+                  <button 
+                    onClick={handleExportCSV}
+                    className="flex items-center justify-center gap-1.5 bg-white border border-neutral-200 text-neutral-600 hover:text-ink hover:border-neutral-300 text-xs font-bold uppercase tracking-wider px-4 py-2.5 rounded-xl transition-all shadow-sm w-full sm:w-auto"
+                  >
+                    <Download size={14} /> Export CSV
+                  </button>
+                  <button 
+                    onClick={() => {
+                      setEditingId(null);
+                      setForm(emptyForm);
+                      setShowProductForm(!showProductForm);
+                    }}
+                    className="flex items-center justify-center gap-1 bg-ink text-white hover:bg-neutral-800 text-xs font-bold uppercase tracking-wider px-5 py-2.5 rounded-xl transition-all shadow-md w-full sm:w-auto"
+                  >
+                    <Plus size={15} /> Add Product
+                  </button>
+                </div>
+              </div>
+
+              {/* Product Form Panel Overlay/Inline */}
+              {showProductForm && (
+                <div className="bg-white border border-neutral-200/80 rounded-2xl p-6 shadow-md space-y-6 animate-fade-in">
+                  <div className="flex items-center justify-between border-b border-neutral-100 pb-3">
+                    <h3 className="text-sm font-bold uppercase tracking-wider text-ink">
+                      {editingId ? `Editing Product: ${form.name}` : "Create New Corporate Product"}
+                    </h3>
+                    <button 
+                      onClick={() => setShowProductForm(false)}
+                      className="text-xs uppercase tracking-wider text-neutral-400 hover:text-ink font-bold"
+                    >
+                      Close Form
+                    </button>
+                  </div>
+                  
+                  <form onSubmit={handleProductSubmit} className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                    <div className="md:col-span-2 space-y-4">
+                      <div>
+                        <label className="block text-[10px] font-bold uppercase tracking-wider text-neutral-400 mb-1">Product Name</label>
+                        <input
+                          className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-4 py-2.5 text-xs outline-none focus:border-ink"
+                          placeholder="Fuzo Smart Thermos Flask 500ml"
+                          value={form.name}
+                          onChange={(e) => setForm({ ...form, name: e.target.value })}
+                          required
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="block text-[10px] font-bold uppercase tracking-wider text-neutral-400 mb-1">Description / Pricing details</label>
+                        <textarea
+                          className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-4 py-2.5 text-xs outline-none focus:border-ink"
+                          placeholder="Double-walled stainless steel, temperature display, premium rubber finish..."
+                          value={form.description}
+                          onChange={(e) => setForm({ ...form, description: e.target.value })}
+                          rows={4}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-[10px] font-bold uppercase tracking-wider text-neutral-400 mb-1">Image URL</label>
+                        <input
+                          className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-4 py-2.5 text-xs outline-none focus:border-ink"
+                          placeholder="https://images.unsplash.com/..."
+                          value={form.image_url}
+                          onChange={(e) => setForm({ ...form, image_url: e.target.value })}
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-[10px] font-bold uppercase tracking-wider text-neutral-400 mb-1">Base Price (INR)</label>
+                          <input
+                            type="number"
+                            min={0}
+                            step="0.01"
+                            className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-4 py-2.5 text-xs outline-none focus:border-ink"
+                            placeholder="650"
+                            value={form.price}
+                            onChange={(e) => setForm({ ...form, price: Number(e.target.value) })}
+                            required
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold uppercase tracking-wider text-neutral-400 mb-1">Stock Quantity</label>
+                          <input
+                            type="number"
+                            min={0}
+                            className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-4 py-2.5 text-xs outline-none focus:border-ink"
+                            placeholder="120"
+                            value={form.quantity}
+                            onChange={(e) => setForm({ ...form, quantity: Number(e.target.value) })}
+                            required
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-bold uppercase tracking-wider text-neutral-400 mb-1">Category Category</label>
+                        <select
+                          className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-3 py-2.5 text-xs outline-none focus:border-ink"
+                          value={form.category_id}
+                          onChange={(e) => setForm({ ...form, category_id: e.target.value })}
+                        >
+                          <option value="">Select Category</option>
+                          {categories.map((c) => (
+                            <option key={c.id} value={c.id}>{c.name}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="pt-2">
+                        <label className="flex items-center gap-2 text-xs font-semibold text-neutral-700 cursor-pointer select-none">
+                          <input
+                            type="checkbox"
+                            className="w-4 h-4 rounded border-neutral-300 accent-ink cursor-pointer"
+                            checked={form.is_visible}
+                            onChange={(e) => setForm({ ...form, is_visible: e.target.checked })}
+                          />
+                          Make visible in public catalogue
+                        </label>
+                      </div>
+                    </div>
+
+                    <div className="md:col-span-3 flex justify-end gap-3 border-t border-neutral-100 pt-4">
+                      <button 
+                        type="button" 
+                        onClick={() => { setShowProductForm(false); setEditingId(null); setForm(emptyForm); }}
+                        className="bg-white border border-neutral-200 text-neutral-600 hover:bg-neutral-50 text-xs font-bold uppercase tracking-wider px-6 py-3 rounded-xl transition-all"
+                      >
+                        Cancel
+                      </button>
+                      <button 
+                        type="submit"
+                        className="bg-ink text-white hover:bg-neutral-800 text-xs font-bold uppercase tracking-wider px-8 py-3 rounded-xl transition-all"
+                      >
+                        {editingId ? "Save Changes" : "Create Product"}
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              )}
+
+              {/* Product Grid Table */}
+              <div className="bg-white border border-neutral-200/80 rounded-2xl overflow-hidden shadow-sm">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-neutral-50/70 border-b border-neutral-200/60 text-[10px] font-bold uppercase tracking-widest text-neutral-400">
+                        <th className="py-4.5 px-6">Product Details</th>
+                        <th className="py-4.5 px-6">Category</th>
+                        <th className="py-4.5 px-6">Price</th>
+                        <th className="py-4.5 px-6">Qty in Stock</th>
+                        <th className="py-4.5 px-6">Stock Status</th>
+                        <th className="py-4.5 px-6">Visibility</th>
+                        <th className="py-4.5 px-6 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-neutral-100 text-xs">
+                      {filteredProducts.length === 0 ? (
+                        <tr>
+                          <td colSpan={7} className="py-12 text-center text-neutral-400 italic">
+                            No products found matching your filter parameters.
+                          </td>
+                        </tr>
+                      ) : (
+                        filteredProducts.map((p) => (
+                          <tr key={p.id} className="hover:bg-neutral-50/40 transition-colors">
+                            <td className="py-4 px-6 font-semibold text-ink">
+                              <div className="flex items-center gap-3">
+                                {p.image_url ? (
+                                  // eslint-disable-next-line @next/next/no-img-element
+                                  <img src={p.image_url} alt="" className="w-10 h-10 object-cover rounded-lg border border-neutral-100" />
+                                ) : (
+                                  <div className="w-10 h-10 bg-neutral-100 text-neutral-300 rounded-lg flex items-center justify-center">
+                                    <ImageIcon size={14} />
+                                  </div>
+                                )}
+                                <div>
+                                  <span className="font-bold text-neutral-800 block">{p.name}</span>
+                                  <span className="text-[10px] text-neutral-400 font-mono select-all">slug: {p.slug}</span>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="py-4 px-6 text-neutral-500 font-semibold">{p.category?.name || "—"}</td>
+                            <td className="py-4 px-6 font-bold text-ink">₹{p.price.toLocaleString("en-IN")}</td>
+                            <td className="py-4 px-6">
+                              <div className="flex items-center gap-2">
+                                <input
+                                  type="number"
+                                  min={0}
+                                  className="w-16 bg-neutral-50 border border-neutral-200 rounded px-2.5 py-1 text-center font-bold text-ink outline-none focus:border-ink"
+                                  value={p.quantity}
+                                  onChange={(e) => quickSetQuantity(p, Number(e.target.value))}
+                                />
+                                <span className="text-[10px] text-neutral-400 font-medium">units</span>
+                              </div>
+                            </td>
+                            <td className="py-4 px-6">
+                              <span
+                                className={`text-[10px] px-2.5 py-1 rounded-full font-bold uppercase tracking-wider ${
+                                  p.stock_status === "out_of_stock"
+                                    ? "bg-red-50 text-red-600 border border-red-100"
+                                    : "bg-emerald-50 text-emerald-700 border border-emerald-100"
+                                }`}
+                              >
+                                {p.stock_status === "out_of_stock" ? "Sold Out" : "In Stock"}
+                              </span>
+                            </td>
+                            <td className="py-4 px-6">
+                              <button 
+                                onClick={() => toggleVisible(p)}
+                                className={`flex items-center gap-1.5 px-3 py-1 rounded-full border transition-all ${
+                                  p.is_visible 
+                                    ? "bg-neutral-50 text-neutral-700 border-neutral-200 hover:border-neutral-400" 
+                                    : "bg-amber-50 text-amber-600 border-amber-100 hover:bg-amber-100/50"
+                                }`}
+                              >
+                                {p.is_visible ? <Eye size={12} /> : <EyeOff size={12} />}
+                                <span className="text-[10px] uppercase font-bold tracking-wider">
+                                  {p.is_visible ? "Public" : "Draft"}
+                                </span>
+                              </button>
+                            </td>
+                            <td className="py-4 px-6 text-right space-x-1.5 whitespace-nowrap">
+                              <button 
+                                onClick={() => startEdit(p)}
+                                className="inline-flex items-center gap-1 bg-white border border-neutral-200 hover:border-neutral-300 text-neutral-600 text-[10px] font-bold uppercase tracking-wider px-3 py-1.5 rounded-lg transition-all"
+                              >
+                                <Edit3 size={11} /> Edit
+                              </button>
+                              {userRole === "admin" && (
+                                <button 
+                                  onClick={() => handleDeleteProduct(p.id)}
+                                  className="inline-flex items-center gap-1 bg-red-50 hover:bg-red-100 text-red-600 text-[10px] font-bold uppercase tracking-wider px-3 py-1.5 rounded-lg transition-all"
+                                >
+                                  <Trash2 size={11} /> Delete
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ==================== TAB: ENQUIRIES ==================== */}
+          {activeTab === "enquiries" && (
+            <div className="space-y-6">
+              
+              {/* Filter controls */}
+              <div className="flex flex-col sm:flex-row items-center gap-4">
+                <div className="relative flex-1 w-full">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" size={16} />
+                  <input
+                    type="text"
+                    className="w-full bg-white border border-neutral-200 rounded-xl pl-9 pr-4 py-2.5 text-xs text-ink outline-none focus:border-ink"
+                    placeholder="Search client name, company, product, or message..."
+                    value={enquirySearchQuery}
+                    onChange={(e) => setEnquirySearchQuery(e.target.value)}
+                  />
+                </div>
+                <select
+                  className="bg-white border border-neutral-200 rounded-xl px-4 py-2.5 text-xs text-neutral-600 outline-none focus:border-ink w-full sm:w-auto"
+                  value={enquiryStatusFilter}
+                  onChange={(e) => setEnquiryStatusFilter(e.target.value)}
+                >
+                  <option value="">All Statuses</option>
+                  <option value="new">New / Unprocessed</option>
+                  <option value="in_progress">In Discussion</option>
+                  <option value="responded">Quoted / Responded</option>
+                  <option value="closed">Closed / Finalized</option>
+                </select>
+              </div>
+
+              {/* Enquiries Grid */}
+              <div className="space-y-4">
+                {filteredEnquiries.length === 0 ? (
+                  <div className="bg-white rounded-2xl p-16 text-center text-neutral-400 italic shadow-sm border border-neutral-200">
+                    No matching client enquiries found.
+                  </div>
+                ) : (
+                  filteredEnquiries.map((enq) => (
+                    <div 
+                      key={enq.id} 
+                      className={`bg-white border rounded-2xl p-6 shadow-sm flex flex-col md:flex-row justify-between gap-6 transition-all ${
+                        enq.status === "new" ? "border-l-4 border-l-red-500 border-neutral-200" : "border-neutral-200/80"
                       }`}
                     >
-                      {p.stock_status === "out_of_stock" ? "Sold Out" : "In Stock"}
-                    </span>
-                  </td>
-                  <td className="py-3 pr-4">
+                      <div className="space-y-4 flex-1">
+                        {/* Title details */}
+                        <div className="flex flex-wrap items-center gap-3">
+                          <span className="text-xs font-bold text-neutral-400">Enquiry #{enq.id}</span>
+                          <span className="text-[10px] text-neutral-400 font-medium flex items-center gap-1">
+                            <Clock size={11} /> {new Date(enq.created_at).toLocaleString("en-IN", { dateStyle: "short", timeStyle: "short" })}
+                          </span>
+                          
+                          {/* Status Pill */}
+                          <span
+                            className={`text-[9px] px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wider ${
+                              enq.status === "new" ? "bg-red-50 text-red-600 border border-red-100" :
+                              enq.status === "in_progress" ? "bg-blue-50 text-blue-600 border border-blue-100" :
+                              enq.status === "responded" ? "bg-amber-50 text-amber-600 border border-amber-100" :
+                              "bg-emerald-50 text-emerald-600 border border-emerald-100"
+                            }`}
+                          >
+                            {enq.status.replace("_", " ")}
+                          </span>
+                        </div>
+
+                        {/* Client details info */}
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 border-b border-neutral-100 pb-3">
+                          <div>
+                            <span className="block text-[9px] font-bold text-neutral-400 uppercase">Contact Name</span>
+                            <span className="text-xs font-bold text-ink">{enq.name}</span>
+                          </div>
+                          <div>
+                            <span className="block text-[9px] font-bold text-neutral-400 uppercase">Company Name</span>
+                            <span className="text-xs font-bold text-ink">{enq.company || "—"}</span>
+                          </div>
+                          <div>
+                            <span className="block text-[9px] font-bold text-neutral-400 uppercase">Phone & Email</span>
+                            <span className="text-xs font-bold text-ink block">{enq.phone}</span>
+                            <span className="text-[10px] text-neutral-500 font-mono block select-all">{enq.email}</span>
+                          </div>
+                        </div>
+
+                        {/* Product Detail Connection */}
+                        {enq.product && (
+                          <div className="bg-neutral-50 rounded-xl p-3 flex items-center gap-3 border border-neutral-200/50">
+                            {enq.product.image_url && (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img src={enq.product.image_url} alt="" className="w-8 h-8 object-cover rounded-lg border border-neutral-100" />
+                            )}
+                            <div>
+                              <span className="block text-[9px] font-bold uppercase tracking-wider text-neutral-400">Target Catalogue Item</span>
+                              <span className="text-xs font-bold text-ink">{enq.product.name} (Base: ₹{enq.product.price})</span>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Message details */}
+                        <div className="bg-neutral-50/50 rounded-xl p-4 border border-neutral-100">
+                          <span className="block text-[9px] font-bold text-neutral-400 uppercase mb-1">Requirement Notes</span>
+                          <p className="text-xs text-neutral-600 leading-relaxed font-light">{enq.message}</p>
+                        </div>
+                      </div>
+
+                      {/* Actions sidebar */}
+                      <div className="md:w-56 flex flex-col justify-between border-t md:border-t-0 md:border-l border-neutral-100 pt-4 md:pt-0 md:pl-6 gap-4">
+                        <div>
+                          <label className="block text-[9px] font-bold text-neutral-400 uppercase mb-2">Process Enquiry Status</label>
+                          <select
+                            className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-3 py-2 text-xs font-semibold text-neutral-700 outline-none focus:border-ink"
+                            value={enq.status}
+                            onChange={(e) => handleEnquiryStatusChange(enq.id, e.target.value)}
+                          >
+                            <option value="new">New Enquiry</option>
+                            <option value="in_progress">In Discussion</option>
+                            <option value="responded">Quoted / Sent</option>
+                            <option value="closed">Closed / Completed</option>
+                          </select>
+                        </div>
+
+                        <div className="space-y-2">
+                          <button
+                            onClick={() => launchWhatsApp(enq)}
+                            className="w-full flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold uppercase tracking-wider py-3 rounded-xl transition-all shadow-sm"
+                          >
+                            <Smartphone size={13} /> Message WhatsApp
+                          </button>
+                        </div>
+                      </div>
+
+                    </div>
+                  ))
+                )}
+              </div>
+
+            </div>
+          )}
+
+          {/* ==================== TAB: CATEGORIES ==================== */}
+          {activeTab === "categories" && (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              
+              {/* Category creation */}
+              <div className="bg-white border border-neutral-200/80 rounded-2xl p-6 shadow-sm space-y-4 h-fit">
+                <h3 className="text-xs font-bold uppercase tracking-widest text-neutral-400">Add New Category</h3>
+                <form onSubmit={handleAddCategory} className="space-y-3">
+                  <input
+                    type="text"
+                    placeholder="Eco Lifestyle"
+                    className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-4 py-2.5 text-xs outline-none focus:border-ink"
+                    value={newCategory}
+                    onChange={(e) => setNewCategory(e.target.value)}
+                    required
+                  />
+                  <button className="w-full bg-ink text-white hover:bg-neutral-800 text-xs font-bold uppercase tracking-wider py-3 rounded-xl transition-all shadow-sm flex items-center justify-center gap-1">
+                    <Plus size={14} /> Create Category
+                  </button>
+                </form>
+              </div>
+
+              {/* Categories list */}
+              <div className="md:col-span-2 bg-white border border-neutral-200/80 rounded-2xl p-6 shadow-sm space-y-4">
+                <h3 className="text-xs font-bold uppercase tracking-widest text-neutral-400">Categories List ({categories.length})</h3>
+                <div className="divide-y divide-neutral-100 max-h-96 overflow-y-auto">
+                  {categories.map((c) => (
+                    <div key={c.id} className="py-3 flex items-center justify-between">
+                      <div>
+                        <span className="font-bold text-neutral-700 block">{c.name}</span>
+                        <span className="text-[10px] text-neutral-400 font-mono block select-all">slug: {c.slug}</span>
+                      </div>
+                      <span className="text-[10px] font-bold bg-neutral-100 text-neutral-500 border border-neutral-200/50 px-3 py-1 rounded-lg">
+                        ID: {c.id}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+            </div>
+          )}
+
+          {/* ==================== TAB: TEAM (Admin Only) ==================== */}
+          {activeTab === "team" && userRole === "admin" && (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              
+              {/* Create User form */}
+              <div className="bg-white border border-neutral-200/80 rounded-2xl p-6 shadow-sm space-y-4 h-fit">
+                <h3 className="text-xs font-bold uppercase tracking-widest text-neutral-400">Add Team Member</h3>
+                <form onSubmit={handleCreateUser} className="space-y-4">
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase tracking-wider text-neutral-400 mb-1">Username</label>
                     <input
-                      type="checkbox"
-                      checked={p.is_visible}
-                      onChange={() => toggleVisible(p)}
+                      type="text"
+                      placeholder="aditya_fuzo"
+                      className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-4 py-2.5 text-xs outline-none focus:border-ink"
+                      value={newUsername}
+                      onChange={(e) => setNewUsername(e.target.value)}
+                      required
                     />
-                  </td>
-                  <td className="py-3 pr-4 whitespace-nowrap">
-                    <button className="text-xs underline mr-3" onClick={() => startEdit(p)}>Edit</button>
-                    <button className="text-xs text-red-500 underline" onClick={() => handleDelete(p.id)}>Delete</button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </section>
-      </main>
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase tracking-wider text-neutral-400 mb-1">Password</label>
+                    <input
+                      type="password"
+                      placeholder="••••••••"
+                      className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-4 py-2.5 text-xs outline-none focus:border-ink"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase tracking-wider text-neutral-400 mb-1">Role Permission</label>
+                    <select
+                      className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-3 py-2.5 text-xs outline-none focus:border-ink font-semibold"
+                      value={newRole}
+                      onChange={(e) => setNewRole(e.target.value)}
+                    >
+                      <option value="employee">Employee (Inventory & Enquiries)</option>
+                      <option value="admin">Administrator (Full Access)</option>
+                    </select>
+                  </div>
+
+                  <button className="w-full bg-ink text-white hover:bg-neutral-800 text-xs font-bold uppercase tracking-wider py-3 rounded-xl transition-all shadow-sm flex items-center justify-center gap-1.5">
+                    <UserPlus size={14} /> Create Account
+                  </button>
+                </form>
+              </div>
+
+              {/* Users list */}
+              <div className="md:col-span-2 bg-white border border-neutral-200/80 rounded-2xl p-6 shadow-sm space-y-4">
+                <h3 className="text-xs font-bold uppercase tracking-widest text-neutral-400">Team Users ({teamUsers.length})</h3>
+                <div className="divide-y divide-neutral-100 overflow-y-auto max-h-96">
+                  {teamUsers.map((user) => (
+                    <div key={user.id} className="py-3 flex items-center justify-between">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-neutral-700">{user.username}</span>
+                          <span 
+                            className={`text-[8px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border ${
+                              user.role === "admin" 
+                                ? "bg-purple-50 text-purple-600 border-purple-100" 
+                                : "bg-neutral-50 text-neutral-500 border-neutral-200"
+                            }`}
+                          >
+                            {user.role}
+                          </span>
+                        </div>
+                        <span className="text-[10px] text-neutral-400 block">
+                          Created: {new Date(user.created_at).toLocaleString("en-IN", { dateStyle: "short" })}
+                        </span>
+                      </div>
+
+                      {user.username !== currentUser ? (
+                        <button
+                          onClick={() => handleDeleteUser(user.id)}
+                          className="bg-red-50 hover:bg-red-100 text-red-600 hover:text-red-700 text-[10px] font-bold uppercase tracking-wider px-3.5 py-1.5 rounded-lg border border-red-100 transition-colors flex items-center gap-1"
+                        >
+                          <Trash2 size={11} /> Remove
+                        </button>
+                      ) : (
+                        <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest bg-neutral-50 border border-neutral-100 px-3 py-1.5 rounded-lg">
+                          Active Account
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+            </div>
+          )}
+
+        </main>
+      </div>
+
     </div>
   );
 }
