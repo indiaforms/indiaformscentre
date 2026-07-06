@@ -90,6 +90,16 @@ class Enquiry(Base):
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
 
+class Client(Base):
+    __tablename__ = "clients"
+    id = Column(Integer, primary_key=True)
+    name = Column(String, nullable=False)
+    email = Column(String, unique=True, nullable=False)
+    company = Column(String, nullable=True)
+    phone = Column(String, nullable=False)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+
 Base.metadata.create_all(bind=engine)
 
 
@@ -243,6 +253,27 @@ class EnquiryUpdate(BaseModel):
     status: str
 
 
+class ClientOut(BaseModel):
+    id: int
+    name: str
+    email: str
+    company: Optional[str] = None
+    phone: str
+    created_at: datetime.datetime
+    class Config:
+        from_attributes = True
+
+
+class EnquiryAdminCreate(BaseModel):
+    name: str
+    email: str
+    company: Optional[str] = ""
+    phone: str
+    message: str
+    product_id: Optional[int] = None
+    status: Optional[str] = "new"
+
+
 # ---------------------------------------------------------------------------
 # App
 # ---------------------------------------------------------------------------
@@ -299,9 +330,23 @@ def get_product(slug: str, db: Session = Depends(get_db)):
     return p
 
 
+def upsert_client(name: str, email: str, company: Optional[str], phone: str, db: Session):
+    client = db.query(Client).filter(Client.email == email).first()
+    if client:
+        client.name = name
+        client.company = company
+        client.phone = phone
+    else:
+        client = Client(name=name, email=email, company=company, phone=phone)
+        db.add(client)
+    db.commit()
+    return client
+
+
 # --- Public: Enquiries ---
 @app.post("/api/enquiries", response_model=EnquiryOut)
 def create_enquiry(data: EnquiryIn, db: Session = Depends(get_db)):
+    upsert_client(data.name, data.email, data.company, data.phone, db)
     enquiry = Enquiry(
         name=data.name,
         email=data.email,
@@ -387,6 +432,29 @@ def admin_update_enquiry(enquiry_id: int, data: EnquiryUpdate, db: Session = Dep
     if not enquiry:
         raise HTTPException(404, "Enquiry not found")
     enquiry.status = data.status
+    db.commit()
+    db.refresh(enquiry)
+    return enquiry
+
+
+@app.get("/api/admin/clients", response_model=List[ClientOut])
+def admin_list_clients(db: Session = Depends(get_db), current_user=Depends(get_current_user)):
+    return db.query(Client).order_by(Client.name.asc()).all()
+
+
+@app.post("/api/admin/enquiries", response_model=EnquiryOut)
+def admin_create_enquiry(data: EnquiryAdminCreate, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
+    upsert_client(data.name, data.email, data.company, data.phone, db)
+    enquiry = Enquiry(
+        name=data.name,
+        email=data.email,
+        company=data.company,
+        phone=data.phone,
+        message=data.message,
+        product_id=data.product_id,
+        status=data.status or "new"
+    )
+    db.add(enquiry)
     db.commit()
     db.refresh(enquiry)
     return enquiry

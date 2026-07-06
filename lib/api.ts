@@ -22,6 +22,15 @@ export type User = {
   created_at: string;
 };
 
+export type Client = {
+  id: number;
+  name: string;
+  email: string;
+  company?: string;
+  phone: string;
+  created_at: string;
+};
+
 export type Enquiry = {
   id: number;
   name: string;
@@ -136,3 +145,21 @@ export const adminCreateUser = (data: { username: string; password_hash?: string
 
 export const adminDeleteUser = (id: number) =>
   request(`/admin/users/${id}`, { method: "DELETE" });
+
+// Clients database list
+export const adminGetClients = (): Promise<Client[]> => request("/admin/clients");
+
+// Admin manual enquiry creator
+export const adminCreateEnquiry = (data: {
+  name: string;
+  email: string;
+  company?: string;
+  phone: string;
+  message: string;
+  product_id?: number | null;
+  status?: string;
+}): Promise<Enquiry> =>
+  request("/admin/enquiries", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });

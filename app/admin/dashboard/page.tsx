@@ -15,11 +15,14 @@ import {
   adminGetUsers,
   adminCreateUser,
   adminDeleteUser,
+  adminGetClients,
+  adminCreateEnquiry,
   type Product,
   type Category,
   type Enquiry,
   type User,
   type Analytics,
+  type Client,
 } from "@/lib/api";
 import { 
   Package, 
@@ -77,6 +80,19 @@ export default function AdminDashboard() {
   const [enquiries, setEnquiries] = useState<Enquiry[]>([]);
   const [teamUsers, setTeamUsers] = useState<User[]>([]);
   const [analytics, setAnalytics] = useState<Analytics | null>(null);
+  const [clients, setClients] = useState<Client[]>([]);
+  const [showEnquiryModal, setShowEnquiryModal] = useState(false);
+  const [manualEnquiryForm, setManualEnquiryForm] = useState({
+    name: "",
+    email: "",
+    company: "",
+    phone: "",
+    message: "Manual order enquiry recorded by administrator.",
+    product_id: "",
+    status: "new",
+  });
+  const [clientSuggestions, setClientSuggestions] = useState<Client[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
   
   const [userRole, setUserRole] = useState<string>("employee");
   const [currentUser, setCurrentUser] = useState<string>("");
@@ -108,17 +124,19 @@ export default function AdminDashboard() {
       setUserRole(role);
       setCurrentUser(user);
 
-      const [p, c, e, a] = await Promise.all([
+      const [p, c, e, a, cl] = await Promise.all([
         adminGetProducts(),
         adminGetCategories(),
         adminGetEnquiries().catch(() => []),
-        adminGetAnalytics().catch(() => null)
+        adminGetAnalytics().catch(() => null),
+        adminGetClients().catch(() => [])
       ]);
       
       setProducts(p);
       setCategories(c);
       setEnquiries(e);
       setAnalytics(a);
+      setClients(cl);
 
       if (role === "admin") {
         const u = await adminGetUsers().catch(() => []);
@@ -338,6 +356,63 @@ export default function AdminDashboard() {
       
     const url = `https://wa.me/${destination}?text=${encodeURIComponent(text)}`;
     window.open(url, "_blank", "noopener,noreferrer");
+  };
+
+  // Submit manual enquiry
+  async function handleManualEnquirySubmit(e: React.FormEvent) {
+    e.preventDefault();
+    clearAlerts();
+    try {
+      const payload = {
+        ...manualEnquiryForm,
+        product_id: manualEnquiryForm.product_id ? Number(manualEnquiryForm.product_id) : null,
+      };
+      await adminCreateEnquiry(payload);
+      setSuccess("Manual enquiry added successfully.");
+      setManualEnquiryForm({
+        name: "",
+        email: "",
+        company: "",
+        phone: "",
+        message: "Manual order enquiry recorded by administrator.",
+        product_id: "",
+        status: "new",
+      });
+      setShowEnquiryModal(false);
+      loadData();
+    } catch (err: any) {
+      setError(err.message || "Failed to create manual enquiry.");
+    }
+  }
+
+  // Handle Client name autocomplete selection
+  const handleSelectClient = (client: Client) => {
+    setManualEnquiryForm({
+      ...manualEnquiryForm,
+      name: client.name,
+      email: client.email,
+      company: client.company || "",
+      phone: client.phone,
+    });
+    setShowSuggestions(false);
+  };
+
+  // Handle client name input typing
+  const handleClientNameChange = (val: string) => {
+    setManualEnquiryForm({
+      ...manualEnquiryForm,
+      name: val,
+    });
+    if (val.trim().length > 0) {
+      const filtered = clients.filter(c => 
+        c.name.toLowerCase().includes(val.toLowerCase()) ||
+        c.email.toLowerCase().includes(val.toLowerCase())
+      );
+      setClientSuggestions(filtered);
+      setShowSuggestions(true);
+    } else {
+      setShowSuggestions(false);
+    }
   };
 
   // Filter products
@@ -925,18 +1000,221 @@ export default function AdminDashboard() {
                     onChange={(e) => setEnquirySearchQuery(e.target.value)}
                   />
                 </div>
-                <select
-                  className="bg-white border border-neutral-200 rounded-xl px-4 py-2.5 text-xs text-neutral-600 outline-none focus:border-ink w-full sm:w-auto"
-                  value={enquiryStatusFilter}
-                  onChange={(e) => setEnquiryStatusFilter(e.target.value)}
-                >
-                  <option value="">All Statuses</option>
-                  <option value="new">New / Unprocessed</option>
-                  <option value="in_progress">In Discussion</option>
-                  <option value="responded">Quoted / Responded</option>
-                  <option value="closed">Closed / Finalized</option>
-                </select>
+                <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
+                  <select
+                    className="bg-white border border-neutral-200 rounded-xl px-4 py-2.5 text-xs text-neutral-600 outline-none focus:border-ink w-full sm:w-auto font-semibold"
+                    value={enquiryStatusFilter}
+                    onChange={(e) => setEnquiryStatusFilter(e.target.value)}
+                  >
+                    <option value="">All Statuses</option>
+                    <option value="new">New / Unprocessed</option>
+                    <option value="in_progress">In Discussion</option>
+                    <option value="responded">Quoted / Responded</option>
+                    <option value="closed">Closed / Finalized</option>
+                  </select>
+                  <button 
+                    onClick={() => {
+                      clearAlerts();
+                      setShowEnquiryModal(true);
+                    }}
+                    className="flex items-center justify-center gap-1.5 bg-ink text-white hover:bg-neutral-800 text-xs font-bold uppercase tracking-wider px-5 py-2.5 rounded-xl transition-all shadow-md w-full sm:w-auto whitespace-nowrap"
+                  >
+                    <Plus size={15} /> Record Enquiry
+                  </button>
+                </div>
               </div>
+
+              {/* Manual Enquiry Modal Overlay */}
+              {showEnquiryModal && (
+                <div className="fixed inset-0 z-50 bg-black/45 backdrop-blur-sm flex items-center justify-center p-6 animate-fade-in">
+                  <div className="bg-white border border-neutral-200 p-8 rounded-3xl shadow-2xl max-w-xl w-full max-h-[90vh] overflow-y-auto space-y-6">
+                    <div className="flex items-center justify-between border-b border-neutral-100 pb-3">
+                      <h3 className="text-sm font-bold uppercase tracking-wider text-ink">Record Manual Client Enquiry</h3>
+                      <button 
+                        onClick={() => {
+                          setShowEnquiryModal(false);
+                          setManualEnquiryForm({
+                            name: "",
+                            email: "",
+                            company: "",
+                            phone: "",
+                            message: "Manual order enquiry recorded by administrator.",
+                            product_id: "",
+                            status: "new",
+                          });
+                          setShowSuggestions(false);
+                        }}
+                        className="text-xs font-bold uppercase tracking-wider text-neutral-400 hover:text-ink"
+                      >
+                        Close
+                      </button>
+                    </div>
+
+                    <form onSubmit={handleManualEnquirySubmit} className="space-y-4 text-left">
+                      {/* Name input with autocomplete */}
+                      <div className="relative">
+                        <label className="block text-[10px] font-bold uppercase tracking-wider text-neutral-400 mb-1">
+                          Client Name
+                        </label>
+                        <input
+                          type="text"
+                          className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-4 py-2.5 text-xs outline-none focus:border-ink text-ink placeholder:text-neutral-300"
+                          placeholder="Start typing client name..."
+                          value={manualEnquiryForm.name}
+                          onChange={(e) => handleClientNameChange(e.target.value)}
+                          onFocus={() => {
+                            if (manualEnquiryForm.name.trim().length > 0) setShowSuggestions(true);
+                          }}
+                          required
+                          autoComplete="off"
+                        />
+                        
+                        {/* Repeat order client suggestions popup */}
+                        {showSuggestions && clientSuggestions.length > 0 && (
+                          <div className="absolute left-0 right-0 mt-1.5 bg-white border border-neutral-200 rounded-xl shadow-xl z-50 max-h-48 overflow-y-auto divide-y divide-neutral-100">
+                            <div className="px-3.5 py-1.5 text-[9px] font-bold text-neutral-400 uppercase bg-neutral-50/70 select-none">
+                              Repeat Order Suggestions
+                            </div>
+                            {clientSuggestions.map((c) => (
+                              <button
+                                key={c.id}
+                                type="button"
+                                onClick={() => handleSelectClient(c)}
+                                className="w-full text-left px-4 py-2.5 text-xs hover:bg-neutral-50 transition-colors flex items-center justify-between"
+                              >
+                                <div>
+                                  <span className="font-bold text-neutral-800 block">{c.name}</span>
+                                  <span className="text-[10px] text-neutral-400 block">{c.company || "No Company"}</span>
+                                </div>
+                                <span className="text-[10px] bg-emerald-50 text-emerald-700 font-bold border border-emerald-100 px-2 py-0.5 rounded-full">
+                                  Repeat Customer
+                                </span>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-[10px] font-bold uppercase tracking-wider text-neutral-400 mb-1">
+                            Email Address
+                          </label>
+                          <input
+                            type="email"
+                            className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-4 py-2.5 text-xs outline-none focus:border-ink text-ink placeholder:text-neutral-300"
+                            placeholder="client@email.com"
+                            value={manualEnquiryForm.email}
+                            onChange={(e) => setManualEnquiryForm({ ...manualEnquiryForm, email: e.target.value })}
+                            required
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold uppercase tracking-wider text-neutral-400 mb-1">
+                            Phone Number
+                          </label>
+                          <input
+                            type="tel"
+                            className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-4 py-2.5 text-xs outline-none focus:border-ink text-ink placeholder:text-neutral-300"
+                            placeholder="+91 98765 43210"
+                            value={manualEnquiryForm.phone}
+                            onChange={(e) => setManualEnquiryForm({ ...manualEnquiryForm, phone: e.target.value })}
+                            required
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-bold uppercase tracking-wider text-neutral-400 mb-1">
+                          Company Name
+                        </label>
+                        <input
+                          type="text"
+                          className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-4 py-2.5 text-xs outline-none focus:border-ink text-ink placeholder:text-neutral-300"
+                          placeholder="Corporation Name"
+                          value={manualEnquiryForm.company}
+                          onChange={(e) => setManualEnquiryForm({ ...manualEnquiryForm, company: e.target.value })}
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-[10px] font-bold uppercase tracking-wider text-neutral-400 mb-1">
+                            Catalogue Product
+                          </label>
+                          <select
+                            className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-3 py-2.5 text-xs outline-none focus:border-ink font-semibold text-neutral-700"
+                            value={manualEnquiryForm.product_id}
+                            onChange={(e) => setManualEnquiryForm({ ...manualEnquiryForm, product_id: e.target.value })}
+                          >
+                            <option value="">No Specific Product</option>
+                            {products.map((p) => (
+                              <option key={p.id} value={p.id}>{p.name}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold uppercase tracking-wider text-neutral-400 mb-1">
+                            Enquiry Status
+                          </label>
+                          <select
+                            className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-3 py-2.5 text-xs outline-none focus:border-ink font-semibold text-neutral-700"
+                            value={manualEnquiryForm.status}
+                            onChange={(e) => setManualEnquiryForm({ ...manualEnquiryForm, status: e.target.value })}
+                          >
+                            <option value="new">New / Unprocessed</option>
+                            <option value="in_progress">In Discussion</option>
+                            <option value="responded">Quoted / Responded</option>
+                            <option value="closed">Closed / Finalized</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-bold uppercase tracking-wider text-neutral-400 mb-1">
+                          Requirement Details
+                        </label>
+                        <textarea
+                          className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-4 py-2.5 text-xs outline-none focus:border-ink text-ink placeholder:text-neutral-300"
+                          placeholder="Manual notes, target quantity, customization details..."
+                          rows={4}
+                          value={manualEnquiryForm.message}
+                          onChange={(e) => setManualEnquiryForm({ ...manualEnquiryForm, message: e.target.value })}
+                          required
+                        />
+                      </div>
+
+                      <div className="flex justify-end gap-3 border-t border-neutral-100 pt-4">
+                        <button 
+                          type="button" 
+                          onClick={() => {
+                            setShowEnquiryModal(false);
+                            setManualEnquiryForm({
+                              name: "",
+                              email: "",
+                              company: "",
+                              phone: "",
+                              message: "Manual order enquiry recorded by administrator.",
+                              product_id: "",
+                              status: "new",
+                            });
+                            setShowSuggestions(false);
+                          }}
+                          className="bg-white border border-neutral-200 text-neutral-600 hover:bg-neutral-50 text-xs font-bold uppercase tracking-wider px-6 py-3 rounded-xl transition-all"
+                        >
+                          Cancel
+                        </button>
+                        <button 
+                          type="submit"
+                          className="bg-ink text-white hover:bg-neutral-800 text-xs font-bold uppercase tracking-wider px-8 py-3 rounded-xl transition-all"
+                        >
+                          Save Record
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                </div>
+              )}
 
               {/* Enquiries Grid */}
               <div className="space-y-4">
