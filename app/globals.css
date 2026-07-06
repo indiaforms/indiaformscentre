@@ -1,0 +1,27 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  @apply bg-cream text-ink antialiased;
+}
+
+.container-px {
+  @apply px-6 md:px-12;
+}
+
+.btn-primary {
+  @apply inline-block bg-ink text-white text-sm tracking-wide uppercase px-6 py-3 rounded-full hover:bg-neutral-800 transition-colors;
+}
+
+.btn-outline {
+  @apply inline-block border border-ink text-ink text-sm tracking-wide uppercase px-6 py-3 rounded-full hover:bg-ink hover:text-white transition-colors;
+}
+
+.section-title {
+  @apply text-3xl md:text-5xl font-light tracking-tight mb-8;
+}
