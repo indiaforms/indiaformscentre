@@ -2,14 +2,17 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "India Forms Center | Customized Corporate Gifting Solutions",
-  description: "Design-led, high-utility corporate products customized for your brand identity.",
+  title: "India Forms Center | Premium Corporate Gifting & Branded Merchandise",
+  description: "Design-led, high-utility corporate products customized for your brand identity. Explore our catalogue of premium executive gifts, onboarding kits, and branded merchandise.",
+  keywords: "corporate gifting, branded merchandise, executive gifts, custom products, India Forms Center",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <script
           dangerouslySetInnerHTML={{
             __html: `
