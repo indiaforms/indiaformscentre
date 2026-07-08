@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { Sun, Moon, Briefcase, Menu, X } from "lucide-react";
+import { Sun, Moon, Briefcase, Menu, X, UserCog } from "lucide-react";
 
 export default function Navbar() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -108,23 +108,47 @@ export default function Navbar() {
               </div>
             </button>
 
-            {isLoggedIn ? (
+            {!isLoggedIn && (
+              <div className="hidden md:flex items-center gap-2">
+                {/* Employee Login Button */}
+                <Link
+                  href="/admin/login?role=employee"
+                  className={`group relative p-2.5 rounded-xl transition-all duration-300 ${
+                    scrolled || theme === "dark"
+                      ? "bg-white/10 hover:bg-white/20 border border-white/15 text-white hover:text-emerald-400"
+                      : "bg-black/5 hover:bg-black/10 border border-black/10 text-slate-700 hover:text-emerald-600"
+                  }`}
+                  aria-label="Employee Portal"
+                >
+                  <Briefcase size={14} />
+                  <span className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 scale-0 group-hover:scale-100 transition-all duration-200 bg-slate-900 text-white text-[9px] uppercase font-bold tracking-widest px-2.5 py-1 rounded-lg shadow-md whitespace-nowrap pointer-events-none">
+                    Employee Login
+                  </span>
+                </Link>
+
+                {/* Admin Login Button */}
+                <Link
+                  href="/admin/login?role=admin"
+                  className={`group relative p-2.5 rounded-xl transition-all duration-300 ${
+                    scrolled || theme === "dark"
+                      ? "bg-white/10 hover:bg-white/20 border border-white/15 text-white hover:text-blue-400"
+                      : "bg-black/5 hover:bg-black/10 border border-black/10 text-slate-700 hover:text-blue-600"
+                  }`}
+                  aria-label="Admin Portal"
+                >
+                  <UserCog size={14} />
+                  <span className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 scale-0 group-hover:scale-100 transition-all duration-200 bg-slate-900 text-white text-[9px] uppercase font-bold tracking-widest px-2.5 py-1 rounded-lg shadow-md whitespace-nowrap pointer-events-none">
+                    Admin Login
+                  </span>
+                </Link>
+              </div>
+            )}
+            {isLoggedIn && (
               <Link
                 href="/admin/dashboard"
                 className="hidden md:flex btn-primary text-xs"
               >
                 Dashboard
-              </Link>
-            ) : (
-              <Link
-                href="/admin/login"
-                className={`hidden md:flex items-center gap-2 text-xs font-bold tracking-widest uppercase px-5 py-2.5 rounded-xl transition-all duration-300 ${
-                  scrolled || theme === "dark"
-                    ? "border border-white/20 text-white bg-white/5 hover:bg-white/15 hover:border-white/35"
-                    : "border border-black/10 text-slate-700 bg-white/60 hover:bg-white/90"
-                }`}
-              >
-                Portal Login
               </Link>
             )}
 
@@ -154,13 +178,34 @@ export default function Navbar() {
                 {link.label}
               </Link>
             ))}
-            <Link
-              href={isLoggedIn ? "/admin/dashboard" : "/admin/login"}
-              onClick={() => setMobileOpen(false)}
-              className="btn-primary text-center mt-4"
-            >
-              {isLoggedIn ? "Dashboard" : "Portal Login"}
-            </Link>
+            {isLoggedIn ? (
+              <Link
+                href="/admin/dashboard"
+                onClick={() => setMobileOpen(false)}
+                className="btn-primary text-center mt-4"
+              >
+                Dashboard
+              </Link>
+            ) : (
+              <div className="grid grid-cols-2 gap-3 mt-4">
+                <Link
+                  href="/admin/login?role=employee"
+                  onClick={() => setMobileOpen(false)}
+                  className="flex items-center justify-center gap-2 py-3 rounded-xl border border-white/20 text-white bg-white/5 hover:bg-white/10 text-xs font-bold uppercase tracking-wider transition-all duration-300"
+                >
+                  <Briefcase size={14} />
+                  <span>Employee</span>
+                </Link>
+                <Link
+                  href="/admin/login?role=admin"
+                  onClick={() => setMobileOpen(false)}
+                  className="flex items-center justify-center gap-2 py-3 rounded-xl border border-white/20 text-white bg-white/5 hover:bg-white/10 text-xs font-bold uppercase tracking-wider transition-all duration-300"
+                >
+                  <UserCog size={14} />
+                  <span>Admin</span>
+                </Link>
+              </div>
+            )}
           </div>
         </div>
       )}

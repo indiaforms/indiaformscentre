@@ -7,6 +7,7 @@ import { getProducts, getCategories, type Product, type Category } from "@/lib/a
 import EnquiryForm from "@/components/EnquiryForm";
 import ServiceCards from "@/components/ServiceCards";
 import { Zap, Star, CheckCircle2 } from "lucide-react";
+import FloatingPortalDock from "@/components/FloatingPortalDock";
 
 export default async function HomePage() {
   let products: Product[] = [];
@@ -245,6 +246,7 @@ export default async function HomePage() {
       </section>
 
       <Footer />
+      <FloatingPortalDock />
     </>
   );
 }
