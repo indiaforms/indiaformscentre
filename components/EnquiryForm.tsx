@@ -43,7 +43,7 @@ export default function EnquiryForm({
         product_id: productId,
       });
 
-      // Prepare WhatsApp redirection link (pan-India corporate helpline number)
+      // Prepare WhatsApp redirection link
       const targetPhone = "919876543210"; // corporate whatsapp number
       const text = `*New Corporate Enquiry (ID: #${result.id})*\n` +
         `*Name:* ${formData.name}\n` +
@@ -74,13 +74,13 @@ export default function EnquiryForm({
 
   if (success) {
     return (
-      <div className="bg-neutral-900 text-white rounded-2xl p-8 text-center space-y-6 shadow-2xl max-w-xl mx-auto animate-fade-in border border-neutral-800">
+      <div className="bg-slate-900 dark:bg-slate-800 text-white rounded-2xl p-8 text-center space-y-6 shadow-2xl max-w-xl mx-auto animate-fade-in border border-slate-800 dark:border-slate-700">
         <div className="w-16 h-16 bg-emerald-500/10 rounded-full flex items-center justify-center mx-auto text-emerald-400">
           <CheckCircle2 size={36} />
         </div>
         <div className="space-y-2">
           <h3 className="text-xl font-bold tracking-wide uppercase">Enquiry Received</h3>
-          <p className="text-sm text-neutral-400">
+          <p className="text-sm text-slate-300">
             Thank you! Your corporate request has been saved in our system.
           </p>
         </div>
@@ -92,7 +92,7 @@ export default function EnquiryForm({
             <MessageSquare size={18} />
             Connect via WhatsApp
           </button>
-          <p className="text-[11px] text-neutral-500">
+          <p className="text-[11px] text-slate-400">
             Click above to route this request instantly to our corporate gifting sales lead.
           </p>
         </div>
@@ -101,18 +101,18 @@ export default function EnquiryForm({
   }
 
   return (
-    <div className={`bg-white border border-neutral-100 rounded-2xl p-8 shadow-sm ${className}`}>
+    <div className={`bg-card border border-border rounded-2xl p-8 shadow-sm ${className}`}>
       <h3 className="text-lg font-bold tracking-wider uppercase mb-6 text-ink">
         {productName ? "Bulk Quote Request" : "Corporate Gifting Enquiry"}
       </h3>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label className="block text-[11px] font-bold tracking-wider uppercase text-neutral-400 mb-1.5">
+          <label className="block text-[11px] font-bold tracking-wider uppercase text-neutral-400 dark:text-neutral-500 mb-1.5">
             Full Name
           </label>
           <input
             type="text"
-            className="w-full border border-neutral-200 focus:border-ink outline-none rounded-xl px-4 py-3 text-sm transition-colors text-ink placeholder:text-neutral-300"
+            className="w-full border border-neutral-200 dark:border-neutral-700/50 bg-white dark:bg-slate-900 focus:border-primary outline-none rounded-xl px-4 py-3 text-sm transition-colors text-ink placeholder:text-neutral-400"
             placeholder="John Doe"
             required
             value={formData.name}
@@ -122,12 +122,12 @@ export default function EnquiryForm({
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="block text-[11px] font-bold tracking-wider uppercase text-neutral-400 mb-1.5">
+            <label className="block text-[11px] font-bold tracking-wider uppercase text-neutral-400 dark:text-neutral-500 mb-1.5">
               Email Address
             </label>
             <input
               type="email"
-              className="w-full border border-neutral-200 focus:border-ink outline-none rounded-xl px-4 py-3 text-sm transition-colors text-ink placeholder:text-neutral-300"
+              className="w-full border border-neutral-200 dark:border-neutral-700/50 bg-white dark:bg-slate-900 focus:border-primary outline-none rounded-xl px-4 py-3 text-sm transition-colors text-ink placeholder:text-neutral-400"
               placeholder="john@company.com"
               required
               value={formData.email}
@@ -135,12 +135,12 @@ export default function EnquiryForm({
             />
           </div>
           <div>
-            <label className="block text-[11px] font-bold tracking-wider uppercase text-neutral-400 mb-1.5">
+            <label className="block text-[11px] font-bold tracking-wider uppercase text-neutral-400 dark:text-neutral-500 mb-1.5">
               Mobile Number
             </label>
             <input
               type="tel"
-              className="w-full border border-neutral-200 focus:border-ink outline-none rounded-xl px-4 py-3 text-sm transition-colors text-ink placeholder:text-neutral-300"
+              className="w-full border border-neutral-200 dark:border-neutral-700/50 bg-white dark:bg-slate-900 focus:border-primary outline-none rounded-xl px-4 py-3 text-sm transition-colors text-ink placeholder:text-neutral-400"
               placeholder="+91 98765 43210"
               required
               value={formData.phone}
@@ -150,12 +150,12 @@ export default function EnquiryForm({
         </div>
 
         <div>
-          <label className="block text-[11px] font-bold tracking-wider uppercase text-neutral-400 mb-1.5">
+          <label className="block text-[11px] font-bold tracking-wider uppercase text-neutral-400 dark:text-neutral-500 mb-1.5">
             Company Name
           </label>
           <input
             type="text"
-            className="w-full border border-neutral-200 focus:border-ink outline-none rounded-xl px-4 py-3 text-sm transition-colors text-ink placeholder:text-neutral-300"
+            className="w-full border border-neutral-200 dark:border-neutral-700/50 bg-white dark:bg-slate-900 focus:border-primary outline-none rounded-xl px-4 py-3 text-sm transition-colors text-ink placeholder:text-neutral-400"
             placeholder="ACME Corp"
             value={formData.company}
             onChange={(e) => setFormData({ ...formData, company: e.target.value })}
@@ -163,11 +163,11 @@ export default function EnquiryForm({
         </div>
 
         <div>
-          <label className="block text-[11px] font-bold tracking-wider uppercase text-neutral-400 mb-1.5">
+          <label className="block text-[11px] font-bold tracking-wider uppercase text-neutral-400 dark:text-neutral-500 mb-1.5">
             Requirements / Quantity
           </label>
           <textarea
-            className="w-full border border-neutral-200 focus:border-ink outline-none rounded-xl px-4 py-3 text-sm transition-colors text-ink placeholder:text-neutral-300"
+            className="w-full border border-neutral-200 dark:border-neutral-700/50 bg-white dark:bg-slate-900 focus:border-primary outline-none rounded-xl px-4 py-3 text-sm transition-colors text-ink placeholder:text-neutral-400"
             placeholder="Describe your corporate gifting requirement (e.g. quantity, printing needs, timeline)..."
             rows={4}
             required
@@ -181,7 +181,7 @@ export default function EnquiryForm({
         <button
           type="submit"
           disabled={submitting}
-          className="w-full flex items-center justify-center gap-2 bg-ink text-white hover:bg-neutral-800 text-sm font-semibold tracking-wider uppercase py-4 rounded-xl transition-all shadow-sm disabled:opacity-50"
+          className="w-full flex items-center justify-center gap-2 bg-primary text-white hover:bg-opacity-95 text-sm font-semibold tracking-wider uppercase py-4 rounded-xl transition-all shadow-sm disabled:opacity-50"
         >
           {submitting ? "Sending..." : "Submit Enquiry"}
           <Send size={14} />

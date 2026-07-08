@@ -46,6 +46,9 @@ import {
   CheckCircle,
   XCircle,
   TrendingDown,
+  Sun,
+  Moon,
+  Briefcase,
   Image as ImageIcon
 } from "lucide-react";
 
@@ -93,6 +96,7 @@ export default function AdminDashboard() {
   });
   const [clientSuggestions, setClientSuggestions] = useState<Client[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [dashboardTheme, setDashboardTheme] = useState("light");
   
   const [userRole, setUserRole] = useState<string>("employee");
   const [currentUser, setCurrentUser] = useState<string>("");
@@ -156,6 +160,9 @@ export default function AdminDashboard() {
       return;
     }
     loadData();
+    
+    const activeTheme = document.documentElement.classList.contains("dark") ? "dark" : "light";
+    setDashboardTheme(activeTheme);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -415,6 +422,18 @@ export default function AdminDashboard() {
     }
   };
 
+  const toggleDashboardTheme = () => {
+    if (document.documentElement.classList.contains("dark")) {
+      document.documentElement.classList.remove("dark");
+      localStorage.setItem("theme", "light");
+      setDashboardTheme("light");
+    } else {
+      document.documentElement.classList.add("dark");
+      localStorage.setItem("theme", "dark");
+      setDashboardTheme("dark");
+    }
+  };
+
   // Filter products
   const filteredProducts = products.filter((p) => {
     const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
@@ -434,43 +453,53 @@ export default function AdminDashboard() {
   });
 
   return (
-    <div className="min-h-screen bg-neutral-50 flex flex-col font-sans">
+    <div className="min-h-screen bg-cream flex flex-col font-sans transition-colors duration-300">
       
       {/* Top Banner Header */}
-      <header className="bg-white border-b border-neutral-200/80 sticky top-0 z-30 shadow-sm">
+      <header className="bg-card border-b border-border sticky top-0 z-30 shadow-sm transition-colors duration-300">
         <div className="container-px max-w-7xl mx-auto h-20 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-ink flex items-center justify-center text-white font-bold text-lg">
-              F
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-700 to-emerald-600 flex items-center justify-center text-white font-bold text-lg shadow-sm">
+              <Briefcase size={16} />
             </div>
             <div>
-              <h1 className="text-sm font-bold uppercase tracking-wider text-ink">FUZO Centre Portal</h1>
-              <p className="text-[10px] text-neutral-400 uppercase tracking-widest font-semibold">
+              <h1 className="text-sm font-bold uppercase tracking-wider text-ink">India Forms Center Portal</h1>
+              <p className="text-[10px] text-neutral-400 dark:text-neutral-500 uppercase tracking-widest font-semibold">
                 Logged in as: <span className="text-ink font-bold">{currentUser}</span> ({userRole})
               </p>
             </div>
           </div>
           
-          <button 
-            onClick={logout} 
-            className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-neutral-500 hover:text-red-600 transition-colors bg-neutral-100 hover:bg-red-50 px-4 py-2 rounded-full"
-          >
-            <LogOut size={13} />
-            Log Out
-          </button>
+          <div className="flex items-center gap-3">
+            {/* Light/Dark Toggle Button */}
+            <button
+              onClick={toggleDashboardTheme}
+              className="p-2.5 rounded-full hover:bg-neutral-100 dark:hover:bg-slate-800 text-ink transition-colors border border-neutral-200 dark:border-neutral-700/50"
+              aria-label="Toggle theme mode"
+            >
+              {dashboardTheme === "dark" ? <Sun size={14} className="text-amber-400" /> : <Moon size={14} className="text-slate-600" />}
+            </button>
+
+            <button 
+              onClick={logout} 
+              className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-neutral-500 hover:text-red-600 transition-colors bg-neutral-100 dark:bg-slate-800 hover:bg-red-50 dark:hover:bg-red-950/20 px-4 py-2 rounded-full border border-neutral-200 dark:border-neutral-700/50"
+            >
+              <LogOut size={13} />
+              Log Out
+            </button>
+          </div>
         </div>
       </header>
 
       <div className="flex-1 flex flex-col lg:flex-row container-px max-w-7xl mx-auto py-8 gap-8 w-full">
-        
-        {/* Left Sidebar Navigation */}
+               {/* Left Sidebar Navigation */}
         <aside className="w-full lg:w-64 flex flex-row lg:flex-col gap-2 overflow-x-auto lg:overflow-x-visible pb-3 lg:pb-0 h-fit">
           <button
             onClick={() => { setActiveTab("overview"); clearAlerts(); }}
             className={`flex items-center gap-2.5 px-5 py-3.5 rounded-xl text-xs font-bold uppercase tracking-wider whitespace-nowrap transition-all w-full text-left ${
               activeTab === "overview"
-                ? "bg-ink text-white shadow-md shadow-neutral-900/10"
-                : "bg-white text-neutral-600 border border-neutral-200/50 hover:bg-neutral-100/50"
+                ? "bg-primary text-white shadow-md shadow-blue-500/10"
+                : "bg-card text-neutral-600 dark:text-neutral-400 border border-border hover:bg-neutral-100/50 dark:hover:bg-slate-800/50"
             }`}
           >
             <BarChart3 size={15} />
@@ -481,8 +510,8 @@ export default function AdminDashboard() {
             onClick={() => { setActiveTab("inventory"); clearAlerts(); }}
             className={`flex items-center gap-2.5 px-5 py-3.5 rounded-xl text-xs font-bold uppercase tracking-wider whitespace-nowrap transition-all w-full text-left ${
               activeTab === "inventory"
-                ? "bg-ink text-white shadow-md shadow-neutral-900/10"
-                : "bg-white text-neutral-600 border border-neutral-200/50 hover:bg-neutral-100/50"
+                ? "bg-primary text-white shadow-md shadow-blue-500/10"
+                : "bg-card text-neutral-600 dark:text-neutral-400 border border-border hover:bg-neutral-100/50 dark:hover:bg-slate-800/50"
             }`}
           >
             <Package size={15} />
@@ -493,8 +522,8 @@ export default function AdminDashboard() {
             onClick={() => { setActiveTab("enquiries"); clearAlerts(); }}
             className={`flex items-center gap-2.5 px-5 py-3.5 rounded-xl text-xs font-bold uppercase tracking-wider whitespace-nowrap transition-all w-full text-left relative ${
               activeTab === "enquiries"
-                ? "bg-ink text-white shadow-md shadow-neutral-900/10"
-                : "bg-white text-neutral-600 border border-neutral-200/50 hover:bg-neutral-100/50"
+                ? "bg-primary text-white shadow-md shadow-blue-500/10"
+                : "bg-card text-neutral-600 dark:text-neutral-400 border border-border hover:bg-neutral-100/50 dark:hover:bg-slate-800/50"
             }`}
           >
             <MessageSquare size={15} />
@@ -510,21 +539,21 @@ export default function AdminDashboard() {
             onClick={() => { setActiveTab("categories"); clearAlerts(); }}
             className={`flex items-center gap-2.5 px-5 py-3.5 rounded-xl text-xs font-bold uppercase tracking-wider whitespace-nowrap transition-all w-full text-left ${
               activeTab === "categories"
-                ? "bg-ink text-white shadow-md shadow-neutral-900/10"
-                : "bg-white text-neutral-600 border border-neutral-200/50 hover:bg-neutral-100/50"
+                ? "bg-primary text-white shadow-md shadow-blue-500/10"
+                : "bg-card text-neutral-600 dark:text-neutral-400 border border-border hover:bg-neutral-100/50 dark:hover:bg-slate-800/50"
             }`}
           >
             <Layers size={15} />
             Categories
           </button>
-
+ 
           {userRole === "admin" && (
             <button
               onClick={() => { setActiveTab("team"); clearAlerts(); }}
               className={`flex items-center gap-2.5 px-5 py-3.5 rounded-xl text-xs font-bold uppercase tracking-wider whitespace-nowrap transition-all w-full text-left ${
                 activeTab === "team"
-                  ? "bg-ink text-white shadow-md shadow-neutral-900/10"
-                  : "bg-white text-neutral-600 border border-neutral-200/50 hover:bg-neutral-100/50"
+                  ? "bg-primary text-white shadow-md shadow-blue-500/10"
+                  : "bg-card text-neutral-600 dark:text-neutral-400 border border-border hover:bg-neutral-100/50 dark:hover:bg-slate-800/50"
               }`}
             >
               <Users size={15} />

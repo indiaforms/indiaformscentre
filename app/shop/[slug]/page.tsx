@@ -15,11 +15,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     const product = await getProduct(params.slug);
     if (!product) return { title: "Product Not Found" };
     return {
-      title: `${product.name} | Customized Corporate Gift - FUZO Centre`,
+      title: `${product.name} | Customized Corporate Gift - India Forms Center`,
       description: product.description.slice(0, 160) || `Buy custom branded ${product.name} in bulk.`,
     };
   } catch {
-    return { title: "FUZO Centre Catalogue" };
+    return { title: "India Forms Center Catalogue" };
   }
 }
 
@@ -35,7 +35,7 @@ export default async function ProductPage({ params }: Props) {
   return (
     <>
       <Navbar />
-      <section className="bg-cream min-h-screen">
+      <section className="bg-cream min-h-screen transition-colors duration-300">
         <ProductDetailClient product={product} />
       </section>
       <Footer />

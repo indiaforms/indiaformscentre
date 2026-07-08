@@ -17,12 +17,12 @@ export default async function ShopPage({
   return (
     <>
       <Navbar />
-      <section className="bg-cream py-16 min-h-screen">
+      <section className="bg-cream py-16 min-h-screen transition-colors duration-300">
         <div className="container-px max-w-7xl mx-auto space-y-12">
           {/* Header */}
-          <div className="space-y-4">
+          <div className="space-y-4 text-left">
             <h1 className="text-4xl md:text-5xl font-light tracking-tight text-ink">Corporate Catalogue</h1>
-            <p className="text-sm text-neutral-500 max-w-lg leading-relaxed">
+            <p className="text-sm text-neutral-500 dark:text-neutral-400 max-w-lg leading-relaxed">
               Explore our range of customizable, functional merchandise built for branding. Select a category below to filter our collections.
             </p>
           </div>
@@ -33,8 +33,8 @@ export default async function ShopPage({
               href="/shop"
               className={`px-5 py-2.5 rounded-full text-xs font-semibold tracking-wider uppercase border transition-all ${
                 !searchParams.category
-                  ? "bg-ink text-white border-ink shadow-sm"
-                  : "bg-white text-neutral-600 border-neutral-200 hover:border-neutral-400"
+                  ? "bg-primary text-white border-primary shadow-sm"
+                  : "bg-card text-neutral-600 dark:text-neutral-300 border-border hover:border-neutral-400 dark:hover:border-neutral-500"
               }`}
             >
               All Products
@@ -45,8 +45,8 @@ export default async function ShopPage({
                 href={`/shop?category=${c.slug}`}
                 className={`px-5 py-2.5 rounded-full text-xs font-semibold tracking-wider uppercase border transition-all ${
                   searchParams.category === c.slug
-                    ? "bg-ink text-white border-ink shadow-sm"
-                    : "bg-white text-neutral-600 border-neutral-200 hover:border-neutral-400"
+                    ? "bg-primary text-white border-primary shadow-sm"
+                    : "bg-card text-neutral-600 dark:text-neutral-300 border-border hover:border-neutral-400 dark:hover:border-neutral-500"
                 }`}
               >
                 {c.name}
@@ -56,7 +56,7 @@ export default async function ShopPage({
 
           {/* Product Listing */}
           {products.length === 0 ? (
-            <div className="bg-white rounded-2xl p-16 text-center text-neutral-400 shadow-sm border border-neutral-100">
+            <div className="bg-card rounded-2xl p-16 text-center text-neutral-400 dark:text-neutral-500 shadow-sm border border-border">
               No products found in this category.
             </div>
           ) : (

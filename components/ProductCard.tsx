@@ -7,10 +7,10 @@ export default function ProductCard({ product }: { product: Product }) {
   return (
     <Link
       href={`/shop/${product.slug}`}
-      className="group block"
+      className="group block bg-card border border-border/50 rounded-3xl p-4 transition-all hover:shadow-xl hover:shadow-neutral-200/50 dark:hover:shadow-black/20 duration-300"
       aria-disabled={soldOut}
     >
-      <div className="relative aspect-square bg-white rounded-2xl overflow-hidden mb-4">
+      <div className="relative aspect-square bg-neutral-100 dark:bg-slate-900 rounded-2xl overflow-hidden mb-4 border border-neutral-100 dark:border-slate-800">
         {product.image_url ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -21,23 +21,31 @@ export default function ProductCard({ product }: { product: Product }) {
             }`}
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center text-neutral-300 text-sm">
-            No image
+          <div className="w-full h-full flex items-center justify-center text-neutral-400 dark:text-neutral-600 text-xs tracking-wider uppercase font-semibold">
+            No Image
           </div>
         )}
         {soldOut && (
-          <span className="absolute top-3 left-3 bg-ink text-white text-[11px] tracking-wide uppercase px-3 py-1 rounded-full">
+          <span className="absolute top-3 left-3 bg-red-600 text-white text-[9px] font-bold tracking-widest uppercase px-3 py-1 rounded-full shadow-sm">
             Sold Out
           </span>
         )}
       </div>
-      <div className="flex items-baseline justify-between">
-        <h3 className="text-sm font-medium tracking-wide uppercase">{product.name}</h3>
-        <span className="text-sm text-neutral-500">₹{product.price.toLocaleString("en-IN")}</span>
+      <div className="space-y-1.5">
+        {product.category && (
+          <span className="text-[10px] uppercase font-bold tracking-widest text-primary">
+            {product.category.name}
+          </span>
+        )}
+        <div className="flex items-baseline justify-between gap-2">
+          <h3 className="text-sm font-bold tracking-wide uppercase text-ink group-hover:text-primary transition-colors truncate">
+            {product.name}
+          </h3>
+          <span className="text-sm font-bold text-ink shrink-0">
+            ₹{product.price.toLocaleString("en-IN")}
+          </span>
+        </div>
       </div>
-      {product.category && (
-        <p className="text-xs text-neutral-400 mt-1">{product.category.name}</p>
-      )}
     </Link>
   );
 }

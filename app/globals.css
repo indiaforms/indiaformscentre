@@ -2,12 +2,33 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --color-bg: #f8fafc; /* slate-50 */
+  --color-text: #0f172a; /* slate-900 */
+  --color-primary: #1d4ed8; /* blue-700 (premium blue) */
+  --color-secondary: #059669; /* emerald-600 (premium green) */
+  --color-card: #ffffff;
+  --color-border: #e2e8f0;
+  --color-input: #ffffff;
+}
+
+.dark {
+  --color-bg: #0f172a; /* slate-900 */
+  --color-text: #f8fafc; /* slate-50 */
+  --color-primary: #3b82f6; /* blue-500 */
+  --color-secondary: #10b981; /* emerald-500 */
+  --color-card: #1e293b; /* slate-800 */
+  --color-border: #334155; /* slate-700 */
+  --color-input: #1e293b;
+}
+
 html {
   scroll-behavior: smooth;
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 body {
-  @apply bg-cream text-ink antialiased;
+  @apply bg-cream text-ink antialiased transition-colors duration-300;
 }
 
 .container-px {
@@ -15,13 +36,13 @@ body {
 }
 
 .btn-primary {
-  @apply inline-block bg-ink text-white text-sm tracking-wide uppercase px-6 py-3 rounded-full hover:bg-neutral-800 transition-colors;
+  @apply inline-block bg-primary text-white text-sm tracking-wide uppercase px-6 py-3 rounded-full hover:bg-opacity-90 transition-all font-semibold shadow-sm hover:shadow-md;
 }
 
 .btn-outline {
-  @apply inline-block border border-ink text-ink text-sm tracking-wide uppercase px-6 py-3 rounded-full hover:bg-ink hover:text-white transition-colors;
+  @apply inline-block border border-primary text-primary text-sm tracking-wide uppercase px-6 py-3 rounded-full hover:bg-primary hover:text-white transition-all font-semibold;
 }
 
 .section-title {
-  @apply text-3xl md:text-5xl font-light tracking-tight mb-8;
+  @apply text-3xl md:text-5xl font-light tracking-tight mb-8 text-ink;
 }
