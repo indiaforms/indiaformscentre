@@ -8,3 +8,5 @@ __pycache__/
 local.db
 venv/
 .DS_Store
+
+.vercel
