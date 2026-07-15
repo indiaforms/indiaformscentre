@@ -15,7 +15,15 @@ export default async function HomePage() {
   try {
     const [p, c] = await Promise.all([getProducts(), getCategories()]);
     products = p.slice(0, 8);
-    categories = c;
+    // Sort so travel, lifestyle, eco-life, office-essentials, gadgets are ordered nicely for grid spans
+    const order = ["travel", "lifestyle", "eco-life", "office-essentials", "gadgets"];
+    categories = c
+      .filter(cat => cat.is_featured !== false)
+      .sort((a, b) => {
+        const ai = order.indexOf(a.slug);
+        const bi = order.indexOf(b.slug);
+        return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+      });
   } catch {
     products = [];
     categories = [];
@@ -68,6 +76,87 @@ export default async function HomePage() {
                 <div className="text-[11px] font-bold tracking-[0.2em] uppercase text-slate-500">{s.label}</div>
               </div>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── Category Display Grid (Fuzo style - Image 1) ────────────────── */}
+      <section className="relative py-24 bg-cream dark:bg-[#060b18] transition-colors duration-300 overflow-hidden">
+        {/* Subtle grid accent background */}
+        <div className="absolute inset-0 pointer-events-none opacity-20"
+          style={{ backgroundImage: "radial-gradient(circle at 50% 50%, rgba(59,130,246,0.08) 0%, transparent 60%)" }}
+        />
+        
+        <div className="container-px max-w-7xl mx-auto relative z-10">
+          <div className="text-center max-w-2xl mx-auto mb-16 space-y-4">
+            <p className="text-[10px] font-black tracking-[0.35em] uppercase text-primary">Featured Collections</p>
+            <h2 className="text-4xl md:text-5xl font-black tracking-tight text-ink leading-tight">
+              Select Your <br />
+              <span className="gradient-text">Gifting Category</span>
+            </h2>
+            <p className="text-neutral-400 text-xs font-light max-w-md mx-auto">
+              Click on a collection to browse premium customized merchandise items tailored to corporate specifications.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-6 gap-6 auto-rows-[240px] md:auto-rows-[270px]">
+            {categories.map((c, i) => {
+              // Custom responsive grid spans to replicate Image 1
+              let spanClass = "md:col-span-2 md:row-span-1";
+              if (i === 0) {
+                spanClass = "md:col-span-2 md:row-span-2"; // Travel: left tall card
+              } else if (i === 1) {
+                spanClass = "md:col-span-4 md:row-span-1"; // Lifestyle: right landscape card
+              } else if (i === 2) {
+                spanClass = "md:col-span-4 md:row-span-1"; // Eco Life: right landscape card
+              } else if (i === 3) {
+                spanClass = "md:col-span-2 md:row-span-2"; // Office Essentials: left tall card
+              } else if (i === 4) {
+                spanClass = "md:col-span-4 md:row-span-1"; // Gadgets: right landscape card
+              }
+
+              return (
+                <Link
+                  key={c.id}
+                  href={`/shop?category=${c.slug}`}
+                  className={`group relative rounded-3xl overflow-hidden border border-neutral-200/50 dark:border-neutral-800/80 shadow-md hover:shadow-2xl transition-all duration-500 hover:scale-[1.01] ${spanClass}`}
+                >
+                  {/* Category Image */}
+                  {c.image_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={c.image_url}
+                      alt={c.name}
+                      className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-slate-900 flex items-center justify-center text-slate-500 text-xs">
+                      No Image Configured
+                    </div>
+                  )}
+                  {/* Dark gradient overlay */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/30 to-black/10 opacity-70 group-hover:opacity-85 transition-opacity" />
+
+                  {/* Red Category Badge (Exactly like Image 1) */}
+                  <div className="absolute top-4 left-4">
+                    <span className="bg-[#e11d48] text-white text-[9px] font-black uppercase tracking-widest px-3.5 py-1.5 rounded-lg shadow-md border border-red-500/10">
+                      {c.name}
+                    </span>
+                  </div>
+
+                  {/* Hover Actions */}
+                  <div className="absolute bottom-4 left-4 right-4 text-white flex justify-between items-end transform translate-y-1.5 group-hover:translate-y-0 transition-transform duration-300">
+                    <div>
+                      <span className="text-[9px] font-bold tracking-widest text-emerald-400 uppercase">Explore Range</span>
+                      <h3 className="text-base font-black tracking-tight">{c.name}</h3>
+                    </div>
+                    <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white backdrop-blur-sm group-hover:bg-primary transition-colors duration-300">
+                      →
+                    </div>
+                  </div>
+                </Link>
+              );
+            })}
           </div>
         </div>
       </section>

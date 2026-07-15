@@ -9,6 +9,8 @@ import {
   adminUpdateProduct,
   adminDeleteProduct,
   adminCreateCategory,
+  adminUpdateCategory,
+  adminDeleteCategory,
   adminGetEnquiries,
   adminUpdateEnquiryStatus,
   adminGetAnalytics,
@@ -17,6 +19,8 @@ import {
   adminDeleteUser,
   adminGetClients,
   adminCreateEnquiry,
+  getSettings,
+  adminUpdateSettings,
   type Product,
   type Category,
   type Enquiry,
@@ -49,16 +53,19 @@ import {
   Sun,
   Moon,
   Briefcase,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Settings
 } from "lucide-react";
 
 type FormState = {
   name: string;
   description: string;
   price: number;
+  cost: number;
   image_url: string;
   quantity: number;
   is_visible: boolean;
+  subcategory: string;
   category_id: string | number;
 };
 
@@ -66,9 +73,11 @@ const emptyForm: FormState = {
   name: "",
   description: "",
   price: 0,
+  cost: 0,
   image_url: "",
   quantity: 0,
   is_visible: true,
+  subcategory: "",
   category_id: "",
 };
 
@@ -106,6 +115,14 @@ export default function AdminDashboard() {
   const [showProductForm, setShowProductForm] = useState(false);
   const [newCategory, setNewCategory] = useState("");
   
+  // Settings & Category editing states
+  const [settings, setSettings] = useState<Record<string, string>>({ catalogue_url: "/catalogue.pdf" });
+  const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
+  const [editCategoryName, setEditCategoryName] = useState("");
+  const [editCategoryImage, setEditCategoryImage] = useState("");
+  const [editCategorySubcategories, setEditCategorySubcategories] = useState("");
+  const [editCategoryIsFeatured, setEditCategoryIsFeatured] = useState(true);
+  
   // Team creation states
   const [newUsername, setNewUsername] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -128,12 +145,13 @@ export default function AdminDashboard() {
       setUserRole(role);
       setCurrentUser(user);
 
-      const [p, c, e, a, cl] = await Promise.all([
+      const [p, c, e, a, cl, s] = await Promise.all([
         adminGetProducts(),
         adminGetCategories(),
         adminGetEnquiries().catch(() => []),
         adminGetAnalytics().catch(() => null),
-        adminGetClients().catch(() => [])
+        adminGetClients().catch(() => []),
+        getSettings().catch(() => ({ catalogue_url: "/catalogue.pdf" }))
       ]);
       
       setProducts(p);
@@ -141,6 +159,7 @@ export default function AdminDashboard() {
       setEnquiries(e);
       setAnalytics(a);
       setClients(cl);
+      setSettings(s);
 
       if (role === "admin") {
         const u = await adminGetUsers().catch(() => []);
@@ -186,6 +205,7 @@ export default function AdminDashboard() {
     const payload = {
       ...form,
       price: Number(form.price),
+      cost: Number(form.cost),
       quantity: Number(form.quantity),
       category_id: form.category_id ? Number(form.category_id) : null,
     };
@@ -214,12 +234,70 @@ export default function AdminDashboard() {
       name: p.name,
       description: p.description,
       price: p.price,
+      cost: p.cost || 0,
       image_url: p.image_url,
       quantity: p.quantity,
       is_visible: p.is_visible,
+      subcategory: p.subcategory || "",
       category_id: p.category?.id || "",
     });
     setShowProductForm(true);
+  }
+
+  // Category & Settings handlers
+  function handleEditCategory(c: Category) {
+    setSelectedCategory(c);
+    setEditCategoryName(c.name);
+    setEditCategoryImage(c.image_url || "");
+    setEditCategorySubcategories(c.subcategories || "");
+    setEditCategoryIsFeatured(c.is_featured !== false);
+  }
+
+  async function handleSaveCategory(e: React.FormEvent) {
+    e.preventDefault();
+    if (!selectedCategory) return;
+    clearAlerts();
+    try {
+      await adminUpdateCategory(selectedCategory.id, {
+        name: editCategoryName,
+        image_url: editCategoryImage,
+        subcategories: editCategorySubcategories,
+        is_featured: editCategoryIsFeatured
+      });
+      setSuccess("Category updated successfully.");
+      setSelectedCategory(null);
+      const c = await adminGetCategories();
+      setCategories(c);
+    } catch (err: any) {
+      setError(err.message || "Failed to update category.");
+    }
+  }
+
+  async function handleDeleteCategory(id: number) {
+    if (!confirm("Are you sure you want to delete this category? All associated products will lose their category association.")) return;
+    clearAlerts();
+    try {
+      await adminDeleteCategory(id);
+      setSuccess("Category deleted successfully.");
+      const c = await adminGetCategories();
+      setCategories(c);
+      // Reload products to sync
+      const p = await adminGetProducts();
+      setProducts(p);
+    } catch (err: any) {
+      setError(err.message || "Failed to delete category.");
+    }
+  }
+
+  async function handleSaveSettings(e: React.FormEvent) {
+    e.preventDefault();
+    clearAlerts();
+    try {
+      await adminUpdateSettings(settings);
+      setSuccess("Settings saved successfully.");
+    } catch (err: any) {
+      setError(err.message || "Failed to save settings.");
+    }
   }
 
   // Toggle Visibility
@@ -324,12 +402,13 @@ export default function AdminDashboard() {
 
   // Export Inventory to CSV
   const handleExportCSV = () => {
-    const headers = ["Product ID", "Name", "Slug", "Category", "Price (INR)", "Quantity", "Status", "Visible"];
+    const headers = ["Product ID", "Name", "Slug", "Category", "Cost (INR)", "Price (INR)", "Quantity", "Status", "Visible"];
     const rows = products.map((p) => [
       p.id,
       `"${p.name.replace(/"/g, '""')}"`,
       p.slug,
       p.category?.name || "—",
+      p.cost || 0,
       p.price,
       p.quantity,
       p.stock_status === "out_of_stock" ? "Sold Out" : "In Stock",
@@ -534,7 +613,6 @@ export default function AdminDashboard() {
               </span>
             )}
           </button>
-          
           <button
             onClick={() => { setActiveTab("categories"); clearAlerts(); }}
             className={`flex items-center gap-2.5 px-5 py-3.5 rounded-xl text-xs font-bold uppercase tracking-wider whitespace-nowrap transition-all w-full text-left ${
@@ -545,6 +623,19 @@ export default function AdminDashboard() {
           >
             <Layers size={15} />
             Categories
+          </button>
+
+
+          <button
+            onClick={() => { setActiveTab("settings"); clearAlerts(); }}
+            className={`flex items-center gap-2.5 px-5 py-3.5 rounded-xl text-xs font-bold uppercase tracking-wider whitespace-nowrap transition-all w-full text-left ${
+              activeTab === "settings"
+                ? "bg-primary text-white shadow-md shadow-blue-500/10"
+                : "bg-card text-neutral-600 dark:text-neutral-400 border border-border hover:bg-neutral-100/50 dark:hover:bg-slate-800/50"
+            }`}
+          >
+            <Settings size={15} />
+            Settings
           </button>
  
           {userRole === "admin" && (
@@ -832,9 +923,22 @@ export default function AdminDashboard() {
                         />
                       </div>
 
-                      <div className="grid grid-cols-2 gap-4">
+                      <div className="grid grid-cols-3 gap-4">
                         <div>
-                          <label className="block text-[10px] font-bold uppercase tracking-wider text-neutral-400 mb-1">Base Price (INR)</label>
+                          <label className="block text-[10px] font-bold uppercase tracking-wider text-neutral-400 mb-1">Purchase Cost (INR)</label>
+                          <input
+                            type="number"
+                            min={0}
+                            step="0.01"
+                            className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-4 py-2.5 text-xs outline-none focus:border-ink"
+                            placeholder="400"
+                            value={form.cost}
+                            onChange={(e) => setForm({ ...form, cost: Number(e.target.value) })}
+                            required
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold uppercase tracking-wider text-neutral-400 mb-1">Selling Price (INR)</label>
                           <input
                             type="number"
                             min={0}
@@ -861,7 +965,7 @@ export default function AdminDashboard() {
                       </div>
 
                       <div>
-                        <label className="block text-[10px] font-bold uppercase tracking-wider text-neutral-400 mb-1">Category Category</label>
+                        <label className="block text-[10px] font-bold uppercase tracking-wider text-neutral-400 mb-1">Category</label>
                         <select
                           className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-3 py-2.5 text-xs outline-none focus:border-ink"
                           value={form.category_id}
@@ -872,6 +976,17 @@ export default function AdminDashboard() {
                             <option key={c.id} value={c.id}>{c.name}</option>
                           ))}
                         </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-bold uppercase tracking-wider text-neutral-400 mb-1">Subcategory</label>
+                        <input
+                          type="text"
+                          className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-4 py-2.5 text-xs outline-none focus:border-ink"
+                          placeholder="Drinkware"
+                          value={form.subcategory}
+                          onChange={(e) => setForm({ ...form, subcategory: e.target.value })}
+                        />
                       </div>
 
                       <div className="pt-2">
@@ -914,7 +1029,8 @@ export default function AdminDashboard() {
                       <tr className="bg-neutral-50/70 border-b border-neutral-200/60 text-[10px] font-bold uppercase tracking-widest text-neutral-400">
                         <th className="py-4.5 px-6">Product Details</th>
                         <th className="py-4.5 px-6">Category</th>
-                        <th className="py-4.5 px-6">Price</th>
+                        <th className="py-4.5 px-6">Purchase Cost</th>
+                        <th className="py-4.5 px-6">Selling Price</th>
                         <th className="py-4.5 px-6">Qty in Stock</th>
                         <th className="py-4.5 px-6">Stock Status</th>
                         <th className="py-4.5 px-6">Visibility</th>
@@ -924,7 +1040,7 @@ export default function AdminDashboard() {
                     <tbody className="divide-y divide-neutral-100 text-xs">
                       {filteredProducts.length === 0 ? (
                         <tr>
-                          <td colSpan={7} className="py-12 text-center text-neutral-400 italic">
+                          <td colSpan={8} className="py-12 text-center text-neutral-400 italic">
                             No products found matching your filter parameters.
                           </td>
                         </tr>
@@ -948,6 +1064,7 @@ export default function AdminDashboard() {
                               </div>
                             </td>
                             <td className="py-4 px-6 text-neutral-500 font-semibold">{p.category?.name || "—"}</td>
+                            <td className="py-4 px-6 font-medium text-neutral-500">₹{p.cost !== undefined ? p.cost.toLocaleString("en-IN") : "0"}</td>
                             <td className="py-4 px-6 font-bold text-ink">₹{p.price.toLocaleString("en-IN")}</td>
                             <td className="py-4 px-6">
                               <div className="flex items-center gap-2">
@@ -1356,22 +1473,87 @@ export default function AdminDashboard() {
           {activeTab === "categories" && (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               
-              {/* Category creation */}
+              {/* Category creation or Edit Category */}
               <div className="bg-white border border-neutral-200/80 rounded-2xl p-6 shadow-sm space-y-4 h-fit">
-                <h3 className="text-xs font-bold uppercase tracking-widest text-neutral-400">Add New Category</h3>
-                <form onSubmit={handleAddCategory} className="space-y-3">
-                  <input
-                    type="text"
-                    placeholder="Eco Lifestyle"
-                    className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-4 py-2.5 text-xs outline-none focus:border-ink"
-                    value={newCategory}
-                    onChange={(e) => setNewCategory(e.target.value)}
-                    required
-                  />
-                  <button className="w-full bg-ink text-white hover:bg-neutral-800 text-xs font-bold uppercase tracking-wider py-3 rounded-xl transition-all shadow-sm flex items-center justify-center gap-1">
-                    <Plus size={14} /> Create Category
-                  </button>
-                </form>
+                {selectedCategory ? (
+                  <>
+                    <h3 className="text-xs font-bold uppercase tracking-widest text-neutral-400">Edit Category</h3>
+                    <form onSubmit={handleSaveCategory} className="space-y-3">
+                      <div>
+                        <label className="block text-[9px] font-bold uppercase tracking-wider text-neutral-400 mb-1">Name</label>
+                        <input
+                          type="text"
+                          className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-4 py-2.5 text-xs outline-none focus:border-ink"
+                          value={editCategoryName}
+                          onChange={(e) => setEditCategoryName(e.target.value)}
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[9px] font-bold uppercase tracking-wider text-neutral-400 mb-1">Image URL</label>
+                        <input
+                          type="text"
+                          className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-4 py-2.5 text-xs outline-none focus:border-ink"
+                          placeholder="https://images.unsplash.com/photo-..."
+                          value={editCategoryImage}
+                          onChange={(e) => setEditCategoryImage(e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[9px] font-bold uppercase tracking-wider text-neutral-400 mb-1">Subcategories (comma-separated)</label>
+                        <textarea
+                          className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-4 py-2.5 text-xs outline-none focus:border-ink min-h-[80px]"
+                          placeholder="Subcat1, Subcat2, Subcat3"
+                          value={editCategorySubcategories}
+                          onChange={(e) => setEditCategorySubcategories(e.target.value)}
+                        />
+                      </div>
+                      <div className="pt-1">
+                        <label className="flex items-center gap-2 text-xs font-semibold text-neutral-700 cursor-pointer select-none">
+                          <input
+                            type="checkbox"
+                            className="w-4 h-4 rounded border-neutral-300 accent-ink cursor-pointer"
+                            checked={editCategoryIsFeatured}
+                            onChange={(e) => setEditCategoryIsFeatured(e.target.checked)}
+                          />
+                          Feature on Homepage Grid
+                        </label>
+                      </div>
+                      <div className="flex gap-2 pt-2">
+                        <button 
+                          type="submit"
+                          className="flex-1 bg-ink text-white hover:bg-neutral-800 text-xs font-bold uppercase tracking-wider py-3 rounded-xl transition-all shadow-sm flex items-center justify-center gap-1"
+                        >
+                          Save
+                        </button>
+                        <button 
+                          type="button"
+                          onClick={() => setSelectedCategory(null)}
+                          className="bg-white border border-neutral-200 text-neutral-600 hover:bg-neutral-50 text-xs font-bold uppercase tracking-wider px-4 py-3 rounded-xl transition-all"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </form>
+                  </>
+                ) : (
+                  <>
+                    <h3 className="text-xs font-bold uppercase tracking-widest text-neutral-400">Add New Category</h3>
+                    <form onSubmit={handleAddCategory} className="space-y-3">
+                      <input
+                        type="text"
+                        placeholder="Eco Lifestyle"
+                        className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-4 py-2.5 text-xs outline-none focus:border-ink"
+                        value={newCategory}
+                        onChange={(e) => setNewCategory(e.target.value)}
+                        required
+                      />
+                      <button className="w-full bg-ink text-white hover:bg-neutral-800 text-xs font-bold uppercase tracking-wider py-3 rounded-xl transition-all shadow-sm flex items-center justify-center gap-1">
+                        <Plus size={14} /> Create Category
+                      </button>
+                    </form>
+                  </>
+                )}
               </div>
 
               {/* Categories list */}
@@ -1379,14 +1561,53 @@ export default function AdminDashboard() {
                 <h3 className="text-xs font-bold uppercase tracking-widest text-neutral-400">Categories List ({categories.length})</h3>
                 <div className="divide-y divide-neutral-100 max-h-96 overflow-y-auto">
                   {categories.map((c) => (
-                    <div key={c.id} className="py-3 flex items-center justify-between">
-                      <div>
-                        <span className="font-bold text-neutral-700 block">{c.name}</span>
-                        <span className="text-[10px] text-neutral-400 font-mono block select-all">slug: {c.slug}</span>
+                    <div key={c.id} className="py-3.5 flex items-center justify-between gap-4">
+                      <div className="flex items-center gap-3 min-w-0">
+                        {c.image_url ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img 
+                            src={c.image_url} 
+                            alt={c.name} 
+                            className="w-10 h-10 rounded-xl object-cover border border-neutral-200/50 shrink-0" 
+                          />
+                        ) : (
+                          <div className="w-10 h-10 rounded-xl bg-neutral-100 border border-dashed border-neutral-200 flex items-center justify-center text-neutral-400 shrink-0">
+                            <ImageIcon size={16} />
+                          </div>
+                        )}
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-neutral-700 truncate">{c.name}</span>
+                            {c.is_featured !== false && (
+                              <span className="bg-blue-50 text-blue-600 border border-blue-100 text-[8px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-md">
+                                Featured
+                              </span>
+                            )}
+                          </div>
+                          {c.subcategories && (
+                            <span className="text-[10px] text-neutral-400 truncate block max-w-xs md:max-w-md">
+                              Subcategories: {c.subcategories}
+                            </span>
+                          )}
+                          <span className="text-[10px] text-neutral-400 font-mono block select-all">slug: {c.slug}</span>
+                        </div>
                       </div>
-                      <span className="text-[10px] font-bold bg-neutral-100 text-neutral-500 border border-neutral-200/50 px-3 py-1 rounded-lg">
-                        ID: {c.id}
-                      </span>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          onClick={() => handleEditCategory(c)}
+                          className="p-2 bg-neutral-50 hover:bg-neutral-100 border border-neutral-200/50 rounded-xl text-neutral-500 hover:text-ink transition-all"
+                          title="Edit Category Details"
+                        >
+                          <Edit3 size={12} />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteCategory(c.id)}
+                          className="p-2 bg-red-50 hover:bg-red-100 border border-red-100 rounded-xl text-red-500 hover:text-red-700 transition-all"
+                          title="Delete Category"
+                        >
+                          <Trash2 size={12} />
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -1394,6 +1615,43 @@ export default function AdminDashboard() {
 
             </div>
           )}
+
+          {/* ==================== TAB: SETTINGS ==================== */}
+          {activeTab === "settings" && (
+            <div className="bg-white border border-neutral-200/80 rounded-2xl p-6 shadow-sm space-y-6 max-w-2xl">
+              <div>
+                <h3 className="text-xs font-bold uppercase tracking-widest text-neutral-400">Global Website Settings</h3>
+                <p className="text-xs text-neutral-400 mt-1">Configure site-wide parameters such as the catalogue file download link.</p>
+              </div>
+
+              <form onSubmit={handleSaveSettings} className="space-y-5">
+                <div className="space-y-2">
+                  <label className="block text-xs font-bold uppercase tracking-wider text-neutral-600">Download Catalogue PDF Link / File Path</label>
+                  <input
+                    type="text"
+                    className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-4 py-3 text-xs outline-none focus:border-ink"
+                    placeholder="/catalogue.pdf or https://..."
+                    value={settings.catalogue_url || ""}
+                    onChange={(e) => setSettings({ ...settings, catalogue_url: e.target.value })}
+                    required
+                  />
+                  <p className="text-[10px] text-neutral-400">
+                    This path determines where users are directed when clicking the "Download Catalogue" buttons on the storefront.
+                  </p>
+                </div>
+
+                <div className="border-t border-neutral-100 pt-4 flex justify-end">
+                  <button 
+                    type="submit"
+                    className="bg-ink text-white hover:bg-neutral-800 text-xs font-bold uppercase tracking-wider px-8 py-3.5 rounded-xl transition-all shadow-sm"
+                  >
+                    Save Settings
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
+
 
           {/* ==================== TAB: TEAM (Admin Only) ==================== */}
           {activeTab === "team" && userRole === "admin" && (

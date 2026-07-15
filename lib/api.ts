@@ -1,6 +1,13 @@
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 
-export type Category = { id: number; name: string; slug: string };
+export type Category = {
+  id: number;
+  name: string;
+  slug: string;
+  image_url?: string;
+  subcategories?: string;
+  is_featured?: boolean;
+};
 
 export type Product = {
   id: number;
@@ -8,12 +15,15 @@ export type Product = {
   slug: string;
   description: string;
   price: number;
+  cost?: number;
   image_url: string;
   quantity: number;
   is_visible: boolean;
+  subcategory?: string;
   stock_status: "in_stock" | "out_of_stock";
   category: Category | null;
 };
+
 
 export type User = {
   id: number;
@@ -119,8 +129,22 @@ export const adminDeleteProduct = (id: number) =>
 
 export const adminGetCategories = (): Promise<Category[]> => request("/admin/categories");
 
-export const adminCreateCategory = (name: string) =>
-  request("/admin/categories", { method: "POST", body: JSON.stringify({ name }) });
+export const adminCreateCategory = (data: string | Partial<Category>) => {
+  const body = typeof data === "string" ? { name: data } : data;
+  return request("/admin/categories", { method: "POST", body: JSON.stringify(body) });
+};
+
+export const adminUpdateCategory = (id: number, data: Partial<Category>) =>
+  request(`/admin/categories/${id}`, { method: "PUT", body: JSON.stringify(data) });
+
+export const adminDeleteCategory = (id: number) =>
+  request(`/admin/categories/${id}`, { method: "DELETE" });
+
+export const getSettings = (): Promise<Record<string, string>> => request("/settings");
+
+export const adminUpdateSettings = (settings: Record<string, string>) =>
+  request("/admin/settings", { method: "POST", body: JSON.stringify({ settings }) });
+
 
 // Enquiries Management
 export const adminGetEnquiries = (): Promise<Enquiry[]> => request("/admin/enquiries");

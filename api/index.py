@@ -45,6 +45,9 @@ class Category(Base):
     id = Column(Integer, primary_key=True)
     name = Column(String, unique=True, nullable=False)
     slug = Column(String, unique=True, nullable=False)
+    image_url = Column(String, default="")
+    subcategories = Column(String, default="")
+    is_featured = Column(Boolean, default=True)
     products = relationship("Product", back_populates="category")
 
 
@@ -55,12 +58,21 @@ class Product(Base):
     slug = Column(String, unique=True, nullable=False)
     description = Column(String, default="")
     price = Column(Float, nullable=False, default=0.0)
+    cost = Column(Float, nullable=False, default=0.0)
     image_url = Column(String, default="")
     quantity = Column(Integer, nullable=False, default=0)
     is_visible = Column(Boolean, default=True)   # admin toggles public visibility
+    subcategory = Column(String, default="")
     category_id = Column(Integer, ForeignKey("categories.id"), nullable=True)
     category = relationship("Category", back_populates="products")
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+
+class Setting(Base):
+    __tablename__ = "settings"
+    key = Column(String, primary_key=True)
+    value = Column(String, nullable=False)
+
 
     @property
     def stock_status(self):
@@ -101,6 +113,64 @@ class Client(Base):
 
 
 Base.metadata.create_all(bind=engine)
+
+
+def run_migrations_and_seed():
+    db = SessionLocal()
+    try:
+        # Check categories table columns
+        cols = [r[1] for r in db.execute(text("PRAGMA table_info(categories)")).fetchall()]
+        if "image_url" not in cols:
+            db.execute(text("ALTER TABLE categories ADD COLUMN image_url VARCHAR DEFAULT ''"))
+        if "subcategories" not in cols:
+            db.execute(text("ALTER TABLE categories ADD COLUMN subcategories VARCHAR DEFAULT ''"))
+        if "is_featured" not in cols:
+            db.execute(text("ALTER TABLE categories ADD COLUMN is_featured BOOLEAN DEFAULT 1"))
+
+        # Check products table columns
+        prod_cols = [r[1] for r in db.execute(text("PRAGMA table_info(products)")).fetchall()]
+        if "subcategory" not in prod_cols:
+            db.execute(text("ALTER TABLE products ADD COLUMN subcategory VARCHAR DEFAULT ''"))
+        if "cost" not in prod_cols:
+            db.execute(text("ALTER TABLE products ADD COLUMN cost FLOAT DEFAULT 0.0"))
+
+
+        # Seed default settings
+        if not db.query(Setting).filter(Setting.key == "catalogue_url").first():
+            db.add(Setting(key="catalogue_url", value="/catalogue.pdf"))
+        
+        # Seed default category images if empty
+        cats = db.query(Category).all()
+        # Default placeholder/premium images for seeded categories:
+        default_images = {
+            "lifestyle": "https://images.unsplash.com/photo-1544816155-12df9643f363?auto=format&fit=crop&w=800&q=80",
+            "travel": "https://images.unsplash.com/photo-1501785888041-af3ef285b470?auto=format&fit=crop&w=800&q=80",
+            "office-essentials": "https://images.unsplash.com/photo-1505691938895-1758d7feb511?auto=format&fit=crop&w=800&q=80",
+            "gadgets": "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=800&q=80",
+            "eco-life": "https://images.unsplash.com/photo-1542601906990-b4d3fb778b09?auto=format&fit=crop&w=800&q=80"
+        }
+        for c in cats:
+            if not c.image_url and c.slug in default_images:
+                c.image_url = default_images[c.slug]
+            # Default subcategories if empty
+            if not c.subcategories:
+                if c.slug == "lifestyle":
+                    c.subcategories = "Drinkware, Games, Health & Fitness, Home & Living, Lamps & Lights, Work From Home, Others"
+                elif c.slug == "travel":
+                    c.subcategories = "Bag Zone, Leisure & Outdoors, Travel Essentials, Others"
+                elif c.slug == "office-essentials":
+                    c.subcategories = "Bags, Desktop Utilities, Gift Sets, Promotional Items, Stationery, Other"
+                elif c.slug == "gadgets":
+                    c.subcategories = "Computer Accessories, Desk Gadgets, Mobile Accessories, Music Players, Tech Accessories, Others"
+        
+        db.commit()
+    except Exception as e:
+        print("Migration and seed error:", e)
+    finally:
+        db.close()
+
+run_migrations_and_seed()
+
 
 
 def get_db():
@@ -167,12 +237,25 @@ class CategoryOut(BaseModel):
     id: int
     name: str
     slug: str
+    image_url: Optional[str] = ""
+    subcategories: Optional[str] = ""
+    is_featured: Optional[bool] = True
     class Config:
         from_attributes = True
 
 
 class CategoryIn(BaseModel):
     name: str
+    image_url: Optional[str] = ""
+    subcategories: Optional[str] = ""
+    is_featured: Optional[bool] = True
+
+
+class CategoryUpdate(BaseModel):
+    name: Optional[str] = None
+    image_url: Optional[str] = None
+    subcategories: Optional[str] = None
+    is_featured: Optional[bool] = None
 
 
 class ProductOut(BaseModel):
@@ -184,19 +267,26 @@ class ProductOut(BaseModel):
     image_url: str
     quantity: int
     is_visible: bool
+    subcategory: Optional[str] = ""
     stock_status: str
     category: Optional[CategoryOut] = None
     class Config:
         from_attributes = True
 
 
+class ProductAdminOut(ProductOut):
+    cost: float
+
+
 class ProductIn(BaseModel):
     name: str
     description: str = ""
     price: float = Field(ge=0)
+    cost: float = Field(ge=0, default=0.0)
     image_url: str = ""
     quantity: int = Field(ge=0, default=0)
     is_visible: bool = True
+    subcategory: Optional[str] = ""
     category_id: Optional[int] = None
 
 
@@ -204,10 +294,29 @@ class ProductUpdate(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
     price: Optional[float] = None
+    cost: Optional[float] = None
     image_url: Optional[str] = None
     quantity: Optional[int] = None
     is_visible: Optional[bool] = None
+    subcategory: Optional[str] = None
     category_id: Optional[int] = None
+
+
+
+class SettingOut(BaseModel):
+    key: str
+    value: str
+    class Config:
+        from_attributes = True
+
+
+class SettingUpdate(BaseModel):
+    value: str
+
+
+class SettingsUpdatePayload(BaseModel):
+    settings: Dict[str, str]
+
 
 
 class UserOut(BaseModel):
@@ -330,6 +439,374 @@ def get_product(slug: str, db: Session = Depends(get_db)):
     return p
 
 
+# --- PDF Catalogue Generator with Watermark ---
+
+def create_placeholder_image(width, height):
+    from reportlab.platypus import Table, TableStyle, Paragraph
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib import colors
+    styles = getSampleStyleSheet()
+    style = ParagraphStyle(
+        'PlaceholderStyle',
+        parent=styles['Normal'],
+        fontName='Helvetica-Bold',
+        fontSize=8,
+        textColor=colors.HexColor("#94a3b8"),
+        alignment=1 # Centered
+    )
+    cell = [[Paragraph("NO IMAGE", style)]]
+    t = Table(cell, colWidths=[width], rowHeights=[height])
+    t.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,-1), colors.HexColor("#f1f5f9")),
+        ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+        ('BOX', (0,0), (-1,-1), 0.5, colors.HexColor("#cbd5e1")),
+    ]))
+    return t
+
+
+def get_pdf_image(url, width, height):
+    import io
+    import requests
+    from reportlab.platypus import Image as RLImage
+    if not url:
+        return create_placeholder_image(width, height)
+    try:
+        resp = requests.get(url, timeout=2.0)
+        if resp.status_code == 200:
+            img_data = io.BytesIO(resp.content)
+            return RLImage(img_data, width=width, height=height)
+    except Exception:
+        pass
+    return create_placeholder_image(width, height)
+
+
+def create_product_card(product, styles):
+    from reportlab.platypus import Table, TableStyle, Paragraph, Spacer
+    from reportlab.lib.styles import ParagraphStyle
+    from reportlab.lib import colors
+    
+    img_flowable = get_pdf_image(product.image_url, 140, 110)
+    
+    title_style = ParagraphStyle(
+        'CardTitle',
+        parent=styles['Normal'],
+        fontName='Helvetica-Bold',
+        fontSize=8,
+        leading=10,
+        textColor=colors.HexColor("#1e293b"),
+        alignment=1
+    )
+    
+    price_style = ParagraphStyle(
+        'CardPrice',
+        parent=styles['Normal'],
+        fontName='Helvetica-Bold',
+        fontSize=8.5,
+        leading=11,
+        textColor=colors.HexColor("#1d4ed8"),
+        alignment=1
+    )
+    
+    name_para = Paragraph(product.name, title_style)
+    price_para = Paragraph(f"MRP: Rs. {int(product.price):,}", price_style)
+    
+    card_data = [
+        [img_flowable],
+        [Spacer(1, 4)],
+        [name_para],
+        [Spacer(1, 2)],
+        [price_para]
+    ]
+    
+    card_table = Table(card_data, colWidths=[156], rowHeights=[110, 4, 22, 2, 14])
+    card_table.setStyle(TableStyle([
+        ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+        ('BACKGROUND', (0,0), (-1,-1), colors.white),
+        ('BOX', (0,0), (-1,-1), 0.5, colors.HexColor("#e2e8f0")),
+        ('TOPPADDING', (0,0), (-1,-1), 6),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 6),
+        ('LEFTPADDING', (0,0), (-1,-1), 6),
+        ('RIGHTPADDING', (0,0), (-1,-1), 6),
+    ]))
+    return card_table
+
+
+def make_watermark_canvas_class(logo_path=None):
+    from reportlab.pdfgen import canvas
+    from reportlab.lib import colors
+    
+    class WatermarkCanvas(canvas.Canvas):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self.pages = []
+            
+        def showPage(self):
+            self.pages.append(dict(self.__dict__))
+            self._startPage()
+            
+        def save(self):
+            page_count = len(self.pages)
+            for page in self.pages:
+                self.__dict__.update(page)
+                self.draw_page_decorations(page_count)
+                super().showPage()
+            super().save()
+            
+        def draw_page_decorations(self, page_count):
+            self.saveState()
+            
+            # Watermark (large transparent logo)
+            if logo_path and os.path.exists(logo_path):
+                width = 300
+                height = 300
+                x = (595.27 - width) / 2
+                y = (841.89 - height) / 2
+                self.setFillAlpha(0.06)
+                self.setStrokeAlpha(0.06)
+                try:
+                    self.drawImage(logo_path, x, y, width=width, height=height, mask='auto')
+                except Exception:
+                    pass
+                    
+            # Normal decorations (opaque)
+            self.setFillAlpha(1.0)
+            self.setStrokeAlpha(1.0)
+            
+            # Header
+            self.setFont("Helvetica-Bold", 8)
+            self.setFillColor(colors.HexColor("#475569"))
+            self.drawString(36, 810, "INDIA FORMS CENTRE")
+            self.drawRightString(559.27, 810, "OFFICIAL CORPORATE CATALOGUE")
+            self.setStrokeColor(colors.HexColor("#e2e8f0"))
+            self.setLineWidth(0.5)
+            self.line(36, 804, 559.27, 804)
+            
+            # Footer
+            self.line(36, 44, 559.27, 44)
+            self.setFont("Helvetica", 8)
+            self.setFillColor(colors.HexColor("#64748b"))
+            self.drawString(36, 32, "Confidential - Shared For Review")
+            self.drawRightString(559.27, 32, f"Page {self._pageNumber} of {page_count}")
+            
+            self.restoreState()
+            
+    return WatermarkCanvas
+
+
+@app.get("/api/products/catalogue/pdf")
+def download_catalogue_pdf(
+    category: Optional[str] = None,
+    subcategory: Optional[str] = None,
+    search: Optional[str] = None,
+    min_price: Optional[float] = None,
+    max_price: Optional[float] = None,
+    sort: Optional[str] = None,
+    db: Session = Depends(get_db)
+):
+    import io
+    from reportlab.lib.pagesizes import A4
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, KeepTogether
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib import colors
+    from sqlalchemy import or_
+    from fastapi.responses import StreamingResponse
+    
+    # Query visible products
+    q = db.query(Product).filter(Product.is_visible == True)  # noqa: E712
+    if category:
+        q = q.join(Category).filter(Category.slug == category)
+    if subcategory:
+        q = q.filter(Product.subcategory == subcategory)
+    if search:
+        search_like = f"%{search}%"
+        q = q.filter(or_(Product.name.like(search_like), Product.description.like(search_like)))
+    if min_price is not None:
+        q = q.filter(Product.price >= min_price)
+    if max_price is not None:
+        q = q.filter(Product.price <= max_price)
+        
+    products = q.all()
+    
+    # Apply sorting
+    if sort == "price_asc":
+        products = sorted(products, key=lambda x: x.price)
+    elif sort == "price_desc":
+        products = sorted(products, key=lambda x: x.price, reverse=True)
+    elif sort == "name_asc":
+        products = sorted(products, key=lambda x: x.name.lower())
+    elif sort == "name_desc":
+        products = sorted(products, key=lambda x: x.name.lower(), reverse=True)
+    else:
+        products = sorted(products, key=lambda x: x.created_at, reverse=True)
+        
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=A4,
+        leftMargin=36,
+        rightMargin=36,
+        topMargin=54,
+        bottomMargin=54
+    )
+    
+    styles = getSampleStyleSheet()
+    
+    title_style = ParagraphStyle(
+        'CatalogMainTitle',
+        parent=styles['Heading1'],
+        fontName='Helvetica-Bold',
+        fontSize=18,
+        leading=22,
+        textColor=colors.HexColor("#0f172a"),
+        alignment=1,
+        spaceAfter=6
+    )
+    
+    subtitle_style = ParagraphStyle(
+        'CatalogSubtitle',
+        parent=styles['Normal'],
+        fontName='Helvetica',
+        fontSize=8.5,
+        leading=11,
+        textColor=colors.HexColor("#64748b"),
+        alignment=1,
+        spaceAfter=15
+    )
+    
+    filter_style = ParagraphStyle(
+        'CatalogFilters',
+        parent=styles['Normal'],
+        fontName='Helvetica-Oblique',
+        fontSize=8.5,
+        leading=11,
+        textColor=colors.HexColor("#0d9488"),
+        alignment=1,
+        spaceAfter=15
+    )
+    
+    category_title_style = ParagraphStyle(
+        'CategoryTitle',
+        parent=styles['Heading2'],
+        fontName='Helvetica-Bold',
+        fontSize=12,
+        leading=15,
+        textColor=colors.HexColor("#0f172a"),
+        spaceBefore=14,
+        spaceAfter=8,
+        keepWithNext=True
+    )
+    
+    story = []
+    story.append(Spacer(1, 8))
+    story.append(Paragraph("INDIA FORMS CENTRE", title_style))
+    story.append(Paragraph("Premium Corporate Gifting & Customized Merchandise Collection", subtitle_style))
+    
+    is_filtered = any([category, subcategory, search, min_price, max_price, sort])
+    
+    if is_filtered:
+        filter_labels = []
+        if category:
+            cat_obj = db.query(Category).filter(Category.slug == category).first()
+            filter_labels.append(f"Category: {cat_obj.name if cat_obj else category}")
+        if subcategory:
+            filter_labels.append(f"Subcategory: {subcategory}")
+        if search:
+            filter_labels.append(f"Search: \"{search}\"")
+        if min_price is not None or max_price is not None:
+            min_val = int(min_price) if min_price is not None else 0
+            max_val = int(max_price) if max_price is not None else "Max"
+            filter_labels.append(f"Price: Rs. {min_val} - {max_val}")
+        if sort:
+            filter_labels.append(f"Sorted By: {sort.replace('_', ' ').title()}")
+            
+        filters_str = " | ".join(filter_labels)
+        story.append(Paragraph(f"Active Catalogue Filters: {filters_str}", filter_style))
+        
+        if not products:
+            no_products_style = ParagraphStyle('NoProducts', parent=styles['Normal'], fontSize=9.5, textColor=colors.HexColor("#94a3b8"), alignment=1)
+            story.append(Spacer(1, 40))
+            story.append(Paragraph("No products match the selected filters.", no_products_style))
+        else:
+            grid_data = []
+            for i in range(0, len(products), 3):
+                chunk = products[i:i+3]
+                row_cells = []
+                for p in chunk:
+                    row_cells.append(create_product_card(p, styles))
+                while len(row_cells) < 3:
+                    row_cells.append("")
+                grid_data.append([row_cells[0], "", row_cells[1], "", row_cells[2]])
+                
+            grid_table = Table(grid_data, colWidths=[156, 18, 156, 18, 156])
+            grid_table.setStyle(TableStyle([
+                ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+                ('VALIGN', (0,0), (-1,-1), 'TOP'),
+                ('TOPPADDING', (0,0), (-1,-1), 0),
+                ('BOTTOMPADDING', (0,0), (-1,-1), 16),
+                ('LEFTPADDING', (0,0), (-1,-1), 0),
+                ('RIGHTPADDING', (0,0), (-1,-1), 0),
+            ]))
+            story.append(grid_table)
+    else:
+        categories_list = db.query(Category).all()
+        has_any_products = False
+        
+        for cat in categories_list:
+            cat_products = [p for p in products if p.category_id == cat.id]
+            if not cat_products:
+                continue
+            has_any_products = True
+            
+            story.append(Paragraph(cat.name.upper(), category_title_style))
+            story.append(Table([[""]], colWidths=[522], rowHeights=[1.5], style=TableStyle([
+                ('BACKGROUND', (0,0), (-1,-1), colors.HexColor("#1d4ed8")),
+                ('BOTTOMPADDING', (0,0), (-1,-1), 0),
+                ('TOPPADDING', (0,0), (-1,-1), 0),
+            ])))
+            story.append(Spacer(1, 10))
+            
+            grid_data = []
+            for i in range(0, len(cat_products), 3):
+                chunk = cat_products[i:i+3]
+                row_cells = []
+                for p in chunk:
+                    row_cells.append(create_product_card(p, styles))
+                while len(row_cells) < 3:
+                    row_cells.append("")
+                grid_data.append([row_cells[0], "", row_cells[1], "", row_cells[2]])
+                
+            grid_table = Table(grid_data, colWidths=[156, 18, 156, 18, 156])
+            grid_table.setStyle(TableStyle([
+                ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+                ('VALIGN', (0,0), (-1,-1), 'TOP'),
+                ('TOPPADDING', (0,0), (-1,-1), 0),
+                ('BOTTOMPADDING', (0,0), (-1,-1), 16),
+                ('LEFTPADDING', (0,0), (-1,-1), 0),
+                ('RIGHTPADDING', (0,0), (-1,-1), 0),
+            ]))
+            story.append(KeepTogether([grid_table]))
+            story.append(Spacer(1, 12))
+            
+        if not has_any_products:
+            no_products_style = ParagraphStyle('NoProducts', parent=styles['Normal'], fontSize=9.5, textColor=colors.HexColor("#94a3b8"), alignment=1)
+            story.append(Spacer(1, 40))
+            story.append(Paragraph("No products available in the catalogue.", no_products_style))
+            
+    logo_path = "public/logo.jpg"
+    WatermarkCanvas = make_watermark_canvas_class(logo_path)
+    doc.build(story, canvasmaker=WatermarkCanvas)
+    
+    buffer.seek(0)
+    return StreamingResponse(
+        buffer,
+        media_type="application/pdf",
+        headers={"Content-Disposition": "attachment; filename=indiaforms_catalogue.pdf"}
+    )
+
+
+
 def upsert_client(name: str, email: str, company: Optional[str], phone: str, db: Session):
     client = db.query(Client).filter(Client.email == email).first()
     if client:
@@ -362,10 +839,37 @@ def create_enquiry(data: EnquiryIn, db: Session = Depends(get_db)):
     return enquiry
 
 
+# --- Public: Settings ---
+@app.get("/api/settings")
+def get_settings(db: Session = Depends(get_db)):
+    settings = db.query(Setting).all()
+    return {s.key: s.value for s in settings}
+
+
+# --- Private/Admin: Settings ---
+@app.post("/api/admin/settings")
+def update_settings(payload: SettingsUpdatePayload, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
+    for key, val in payload.settings.items():
+        setting = db.query(Setting).filter(Setting.key == key).first()
+        if setting:
+            setting.value = val
+        else:
+            setting = Setting(key=key, value=val)
+            db.add(setting)
+    db.commit()
+    return {"success": True}
+
+
 # --- Private/Admin: Categories ---
 @app.post("/api/admin/categories", response_model=CategoryOut)
 def create_category(data: CategoryIn, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
-    cat = Category(name=data.name, slug=slugify(data.name))
+    cat = Category(
+        name=data.name,
+        slug=slugify(data.name),
+        image_url=data.image_url or "",
+        subcategories=data.subcategories or "",
+        is_featured=data.is_featured if data.is_featured is not None else True
+    )
     db.add(cat)
     db.commit()
     db.refresh(cat)
@@ -377,13 +881,43 @@ def admin_list_categories(db: Session = Depends(get_db), current_user=Depends(ge
     return db.query(Category).all()
 
 
+@app.put("/api/admin/categories/{category_id}", response_model=CategoryOut)
+def update_category(category_id: int, data: CategoryUpdate, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
+    cat = db.query(Category).filter(Category.id == category_id).first()
+    if not cat:
+        raise HTTPException(404, "Category not found")
+    if data.name is not None:
+        cat.name = data.name
+        cat.slug = slugify(data.name)
+    if data.image_url is not None:
+        cat.image_url = data.image_url
+    if data.subcategories is not None:
+        cat.subcategories = data.subcategories
+    if data.is_featured is not None:
+        cat.is_featured = data.is_featured
+    db.commit()
+    db.refresh(cat)
+    return cat
+
+
+@app.delete("/api/admin/categories/{category_id}")
+def delete_category(category_id: int, db: Session = Depends(get_db), current_user=Depends(require_admin)):
+    cat = db.query(Category).filter(Category.id == category_id).first()
+    if not cat:
+        raise HTTPException(404, "Category not found")
+    db.delete(cat)
+    db.commit()
+    return {"deleted": True}
+
+
+
 # --- Private/Admin: Products (full CRUD, sees everything incl. hidden) ---
-@app.get("/api/admin/products", response_model=List[ProductOut])
+@app.get("/api/admin/products", response_model=List[ProductAdminOut])
 def admin_list_products(db: Session = Depends(get_db), current_user=Depends(get_current_user)):
     return db.query(Product).order_by(Product.created_at.desc()).all()
 
 
-@app.post("/api/admin/products", response_model=ProductOut)
+@app.post("/api/admin/products", response_model=ProductAdminOut)
 def admin_create_product(data: ProductIn, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
     slug = slugify(data.name)
     base_slug, i = slug, 1
@@ -397,7 +931,7 @@ def admin_create_product(data: ProductIn, db: Session = Depends(get_db), current
     return product
 
 
-@app.put("/api/admin/products/{product_id}", response_model=ProductOut)
+@app.put("/api/admin/products/{product_id}", response_model=ProductAdminOut)
 def admin_update_product(product_id: int, data: ProductUpdate, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
     product = db.query(Product).filter(Product.id == product_id).first()
     if not product:
@@ -407,6 +941,7 @@ def admin_update_product(product_id: int, data: ProductUpdate, db: Session = Dep
     db.commit()
     db.refresh(product)
     return product
+
 
 
 @app.delete("/api/admin/products/{product_id}")
