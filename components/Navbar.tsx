@@ -10,9 +10,12 @@ import {
   X, 
   UserCog, 
   ChevronDown, 
-  ArrowDownToLine 
+  ArrowDownToLine,
+  Sparkles
 } from "lucide-react";
 import { getCategories, getSettings, type Category } from "@/lib/api";
+import PWAInstallPrompt from "./PWAInstallPrompt";
+import AIGiftFinder from "./AIGiftFinder";
 
 export default function Navbar() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -20,6 +23,7 @@ export default function Navbar() {
   const [theme, setTheme] = useState("light");
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [showAIFinder, setShowAIFinder] = useState(false);
   
   // Custom states for settings & mega-dropdown
   const [categories, setCategories] = useState<Category[]>([]);
@@ -147,6 +151,18 @@ export default function Navbar() {
           {/* Right Actions */}
           <div className="flex items-center gap-3">
             
+            <PWAInstallPrompt />
+
+            {/* AI Gift Finder Trigger */}
+            <button
+              onClick={() => setShowAIFinder(true)}
+              className="hidden md:flex items-center gap-1.5 bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700 text-white text-[10px] font-black tracking-widest uppercase px-5.5 py-2.5 rounded-full transition-all duration-300 shadow-md shadow-indigo-500/20 hover:scale-102 hover:shadow-lg relative overflow-hidden group"
+            >
+              <div className="absolute inset-0 bg-white/20 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700" />
+              <Sparkles size={13} className="animate-pulse relative z-10" />
+              <span className="relative z-10">AI Gift Finder</span>
+            </button>
+
             {/* Download Catalogue button (red Fuzo style) */}
             <a
               href={catalogueUrl}
@@ -177,19 +193,35 @@ export default function Navbar() {
 
             {!isLoggedIn && (
               <div className="hidden md:flex items-center gap-2">
-                {/* Unified Portal Login Button */}
+                {/* Employee Login Button */}
                 <Link
-                  href="/admin/login"
+                  href="/admin/login?role=employee"
+                  className={`group relative p-2.5 rounded-xl transition-all duration-300 ${
+                    scrolled || theme === "dark"
+                      ? "bg-white/10 hover:bg-white/20 border border-white/15 text-white hover:text-emerald-400"
+                      : "bg-black/5 hover:bg-black/10 border border-black/10 text-slate-700 hover:text-emerald-600"
+                  }`}
+                  aria-label="Employee Portal"
+                >
+                  <Briefcase size={14} />
+                  <span className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 scale-0 group-hover:scale-100 transition-all duration-200 bg-slate-900 text-white text-[9px] uppercase font-bold tracking-widest px-2.5 py-1 rounded-lg shadow-md whitespace-nowrap pointer-events-none">
+                    Employee Login
+                  </span>
+                </Link>
+
+                {/* Admin Login Button */}
+                <Link
+                  href="/admin/login?role=admin"
                   className={`group relative p-2.5 rounded-xl transition-all duration-300 ${
                     scrolled || theme === "dark"
                       ? "bg-white/10 hover:bg-white/20 border border-white/15 text-white hover:text-blue-400"
                       : "bg-black/5 hover:bg-black/10 border border-black/10 text-slate-700 hover:text-blue-600"
                   }`}
-                  aria-label="Portal Login"
+                  aria-label="Admin Portal"
                 >
                   <UserCog size={14} />
                   <span className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 scale-0 group-hover:scale-100 transition-all duration-200 bg-slate-900 text-white text-[9px] uppercase font-bold tracking-widest px-2.5 py-1 rounded-lg shadow-md whitespace-nowrap pointer-events-none">
-                    Portal Login
+                    Admin Login
                   </span>
                 </Link>
               </div>
@@ -345,6 +377,10 @@ export default function Navbar() {
               <span>Download Catalogue</span>
             </a>
 
+            <div className="flex justify-center mt-2">
+              <PWAInstallPrompt />
+            </div>
+
             {/* Dashboard / Login */}
             <Link
               href={isLoggedIn ? "/admin/dashboard" : "/admin/login"}
@@ -356,6 +392,8 @@ export default function Navbar() {
           </div>
         </div>
       )}
+
+      <AIGiftFinder isOpen={showAIFinder} onClose={() => setShowAIFinder(false)} />
     </>
   );
 }

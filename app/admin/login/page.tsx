@@ -1,12 +1,14 @@
 "use client";
 
 import { useState, useEffect, Suspense } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { adminLogin } from "@/lib/api";
 import { Lock, User, Briefcase, UserCog } from "lucide-react";
 
 function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const roleParam = searchParams.get("role"); // "admin" or "employee"
 
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -27,6 +29,14 @@ function LoginForm() {
     try {
       const res = await adminLogin(username, password);
 
+      // Enforce role checks on portal login
+      if (roleParam === "admin" && res.role !== "admin") {
+        throw new Error("Access denied. This login is reserved for administrators.");
+      }
+      if (roleParam === "employee" && res.role !== "employee") {
+        throw new Error("Access denied. This login is reserved for employee accounts.");
+      }
+
       localStorage.setItem("admin_token", res.access_token);
       localStorage.setItem("user_role", res.role);
       localStorage.setItem("username", res.username);
@@ -38,13 +48,29 @@ function LoginForm() {
     }
   }
 
-  // Determine portal branding elements
-  const portalTitle = "Partner Portal Login";
-  const portalSubtitle = "Admin and Employee Access";
-  const iconGradient = "from-blue-700 to-emerald-600";
-  const PortalIcon = Briefcase;
-  const accentColorClass = "focus:border-primary";
-  const buttonBgClass = "bg-primary hover:bg-opacity-95";
+  // Determine portal branding elements based on URL query
+  let portalTitle = "Partner Portal Login";
+  let portalSubtitle = "Admin and Employee Access";
+  let iconGradient = "from-blue-700 to-emerald-600";
+  let PortalIcon = Briefcase;
+  let accentColorClass = "focus:border-primary";
+  let buttonBgClass = "bg-primary hover:bg-opacity-95";
+
+  if (roleParam === "admin") {
+    portalTitle = "Admin Portal Login";
+    portalSubtitle = "Administrator Access Only";
+    iconGradient = "from-blue-700 to-indigo-600";
+    PortalIcon = UserCog;
+    accentColorClass = "focus:border-blue-600";
+    buttonBgClass = "bg-blue-600 hover:bg-blue-700";
+  } else if (roleParam === "employee") {
+    portalTitle = "Employee Portal Login";
+    portalSubtitle = "Staff & Employee Access";
+    iconGradient = "from-emerald-600 to-teal-500";
+    PortalIcon = Briefcase;
+    accentColorClass = "focus:border-emerald-600";
+    buttonBgClass = "bg-emerald-600 hover:bg-emerald-700";
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-cream px-6 transition-colors duration-300">

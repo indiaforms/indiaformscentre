@@ -1,15 +1,41 @@
-const CACHE_NAME = "ifc-pwa-cache-v1";
+const CACHE_NAME = 'ifc-pwa-cache-v1';
+const urlsToCache = [
+  '/',
+  '/manifest.json',
+  '/logo.jpg'
+];
 
-self.addEventListener("install", (event) => {
+self.addEventListener('install', (event) => {
+  event.waitUntil(
+    caches.open(CACHE_NAME)
+      .then((cache) => cache.addAll(urlsToCache))
+  );
   self.skipWaiting();
 });
 
-self.addEventListener("activate", (event) => {
-  event.waitUntil(clients.claim());
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    caches.keys().then((cacheNames) => {
+      return Promise.all(
+        cacheNames.map((cacheName) => {
+          if (cacheName !== CACHE_NAME) {
+            return caches.delete(cacheName);
+          }
+        })
+      );
+    })
+  );
+  self.clients.claim();
 });
 
-// A simple fetch handler that network-falls-back to cache, or just network first.
-self.addEventListener("fetch", (event) => {
-  // We can add actual caching strategies here if needed.
-  // For basic PWA installation requirements, simply listening to fetch is enough.
+// A basic fetch handler to satisfy the PWA installability requirement.
+// It tries the network first, and falls back to cache if offline.
+self.addEventListener('fetch', (event) => {
+  if (event.request.method !== 'GET') return;
+  
+  event.respondWith(
+    fetch(event.request).catch(() => {
+      return caches.match(event.request);
+    })
+  );
 });

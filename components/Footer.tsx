@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Briefcase, Phone, Mail, MapPin, ArrowUpRight, ArrowDownToLine } from "lucide-react";
 import { getSettings } from "@/lib/api";
+import PWAInstallPrompt from "./PWAInstallPrompt";
 
 export default function Footer() {
   const year = new Date().getFullYear();
@@ -112,6 +113,9 @@ export default function Footer() {
                 <ArrowDownToLine size={13} />
                 Download Catalogue
               </a>
+              <div className="mt-2">
+                <PWAInstallPrompt />
+              </div>
             </div>
           </div>
         </div>

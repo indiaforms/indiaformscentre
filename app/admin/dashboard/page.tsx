@@ -1,5 +1,4 @@
 "use client";
-import EmployeeGrid from "@/components/EmployeeGrid";
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -55,8 +54,12 @@ import {
   Moon,
   Briefcase,
   Image as ImageIcon,
-  Settings
+  Settings,
+  Sparkles
 } from "lucide-react";
+
+import PWAInstallPrompt from "@/components/PWAInstallPrompt";
+import * as XLSX from "xlsx";
 
 type FormState = {
   name: string;
@@ -124,7 +127,12 @@ export default function AdminDashboard() {
   const [editCategorySubcategories, setEditCategorySubcategories] = useState("");
   const [editCategoryIsFeatured, setEditCategoryIsFeatured] = useState(true);
   
-  
+  // Team creation states
+  const [newUsername, setNewUsername] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [newRole, setNewRole] = useState("employee");
+  const [newName, setNewName] = useState("");
+  const [bulkResults, setBulkResults] = useState<{name: string, username: string, password: string}[] | null>(null);
 
   // Search & Filter states
   const [searchQuery, setSearchQuery] = useState("");
@@ -361,6 +369,98 @@ export default function AdminDashboard() {
       loadData();
     } catch (err: any) {
       setError(err.message || "Failed to update status.");
+    }
+  }
+
+  // Create Team User (Admin only)
+  async function handleCreateUser(e: React.FormEvent) {
+    e.preventDefault();
+    if (!newUsername.trim() || !newPassword.trim()) return;
+    clearAlerts();
+    try {
+      await adminCreateUser({
+        name: newName.trim() || undefined,
+        username: newUsername.trim(),
+        password: newPassword.trim(),
+        role: newRole,
+      });
+      setSuccess(`User Account for "${newUsername.trim()}" created successfully.`);
+      setNewUsername("");
+      setNewPassword("");
+      setNewName("");
+      loadData();
+    } catch (err: any) {
+      setError(err.message || "Failed to create user account.");
+    }
+  }
+
+  // Bulk Upload Employees
+  const handleBulkUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    clearAlerts();
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      try {
+        const bstr = evt.target?.result;
+        const workbook = XLSX.read(bstr, { type: "binary" });
+        const wsname = workbook.SheetNames[0];
+        const ws = workbook.Sheets[wsname];
+        const data = XLSX.utils.sheet_to_json(ws);
+        
+        // Find a column representing Name
+        const names: string[] = [];
+        for (const row of data as any[]) {
+          const nameField = row["Name"] || row["name"] || row["Employee Name"] || row["Full Name"];
+          if (nameField && typeof nameField === "string" && nameField.trim()) {
+            names.push(nameField.trim());
+          }
+        }
+
+        if (names.length === 0) {
+          setError("No valid 'Name' column found in the uploaded file.");
+          return;
+        }
+
+        const token = localStorage.getItem("admin_token");
+        const res = await fetch("/api/admin/employees/bulk", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`
+          },
+          body: JSON.stringify({ names }),
+        });
+        
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.detail || "Failed to bulk upload employees");
+        }
+
+        const resultData = await res.json();
+        setSuccess(`Successfully added ${resultData.added.length} employees.`);
+        setBulkResults(resultData.added);
+        loadData();
+      } catch (err: any) {
+        setError(err.message || "Error processing file upload.");
+      }
+      if (e.target) e.target.value = ""; // Reset input
+    };
+    reader.readAsBinaryString(file);
+  };
+
+  // Delete Team User (Admin only)
+  async function handleDeleteUser(id: number) {
+    if (confirm("Delete this user account?")) {
+      clearAlerts();
+      try {
+        await adminDeleteUser(id);
+        setSuccess("User account removed.");
+        loadData();
+      } catch (err: any) {
+        setError(err.message || "Failed to delete user.");
+      }
     }
   }
 
@@ -612,7 +712,7 @@ export default function AdminDashboard() {
               }`}
             >
               <Users size={15} />
-              Team Management
+              Employees
             </button>
           )}
         </aside>
@@ -757,30 +857,68 @@ export default function AdminDashboard() {
                 </div>
               </div>
 
-              {/* Status Alert Grid */}
-              <div className="bg-white border border-neutral-200/75 rounded-2xl p-6 shadow-sm">
-                <h3 className="text-xs font-bold uppercase tracking-widest text-neutral-400 mb-4 flex items-center gap-1.5">
-                  <AlertTriangle size={14} /> Inventory Alerts
-                </h3>
-                <div className="max-h-60 overflow-y-auto space-y-2">
-                  {products.filter(p => p.quantity <= 3).length === 0 ? (
-                    <p className="text-xs text-neutral-400 italic py-2">All product stocks are at healthy quantities.</p>
-                  ) : (
-                    products.filter(p => p.quantity <= 3).map((p) => (
-                      <div key={p.id} className="flex items-center justify-between py-2.5 px-4 rounded-xl border border-neutral-100 bg-neutral-50">
-                        <div className="flex items-center gap-2">
-                          <div className={`w-2.5 h-2.5 rounded-full ${p.quantity === 0 ? "bg-red-500 animate-pulse" : "bg-amber-500"}`} />
-                          <span className="text-xs font-semibold text-neutral-700">{p.name}</span>
-                          <span className="text-[10px] bg-neutral-200/70 text-neutral-500 px-2 py-0.5 rounded-md uppercase tracking-wider">
-                            {p.category?.name || "No Category"}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Standard Low Stock Alerts */}
+                <div className="bg-white border border-neutral-200/75 rounded-2xl p-6 shadow-sm flex flex-col max-h-[350px]">
+                  <h3 className="text-xs font-bold uppercase tracking-widest text-neutral-400 mb-4 flex items-center gap-1.5">
+                    <AlertTriangle size={14} /> Low Stock Warnings
+                  </h3>
+                  <div className="overflow-y-auto space-y-2 flex-1 pr-2">
+                    {products.filter(p => p.quantity <= 3).length === 0 ? (
+                      <p className="text-xs text-neutral-400 italic py-2">All product stocks are at healthy quantities.</p>
+                    ) : (
+                      products.filter(p => p.quantity <= 3).map((p) => (
+                        <div key={p.id} className="flex items-center justify-between py-2.5 px-4 rounded-xl border border-neutral-100 bg-neutral-50">
+                          <div className="flex items-center gap-2">
+                            <div className={`w-2.5 h-2.5 rounded-full ${p.quantity === 0 ? "bg-red-500 animate-pulse" : "bg-amber-500"}`} />
+                            <span className="text-xs font-semibold text-neutral-700">{p.name}</span>
+                            <span className="text-[10px] bg-neutral-200/70 text-neutral-500 px-2 py-0.5 rounded-md uppercase tracking-wider hidden sm:block">
+                              {p.category?.name || "No Category"}
+                            </span>
+                          </div>
+                          <span className="text-xs font-bold text-ink bg-white border border-neutral-200/60 px-3 py-1 rounded-lg">
+                            {p.quantity === 0 ? "SOLD OUT" : `${p.quantity} Left`}
                           </span>
                         </div>
-                        <span className="text-xs font-bold text-ink bg-white border border-neutral-200/60 px-3 py-1 rounded-lg">
-                          {p.quantity === 0 ? "SOLD OUT" : `${p.quantity} Left`}
-                        </span>
-                      </div>
-                    ))
-                  )}
+                      ))
+                    )}
+                  </div>
+                </div>
+
+                {/* AI Predictive Restock Warnings */}
+                <div className="bg-indigo-50/50 border border-indigo-100 rounded-2xl p-6 shadow-sm flex flex-col max-h-[350px]">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-xs font-bold uppercase tracking-widest text-indigo-800 flex items-center gap-1.5">
+                      <Sparkles size={14} className="text-indigo-500" /> Restock Forecast (AI)
+                    </h3>
+                    <span className="text-[9px] text-indigo-400 uppercase tracking-widest font-bold bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded">
+                      Based on 30-Day Enquiry Velocity
+                    </span>
+                  </div>
+                  <div className="overflow-y-auto space-y-2 flex-1 pr-2">
+                    {!analytics?.inventory_warnings || analytics.inventory_warnings.length === 0 ? (
+                      <p className="text-xs text-indigo-400 italic py-2">No impending stockouts predicted in the next 14 days.</p>
+                    ) : (
+                      analytics.inventory_warnings.map((w, idx) => (
+                        <div key={idx} className="flex items-center justify-between py-2.5 px-4 rounded-xl border border-indigo-100 bg-white shadow-sm">
+                          <div className="flex flex-col">
+                            <span className="text-xs font-bold text-indigo-900">{w.name}</span>
+                            <span className="text-[9px] font-semibold text-indigo-500 uppercase tracking-wider mt-0.5">
+                              {w.daily_rate} enquiries/day
+                            </span>
+                          </div>
+                          <div className="flex flex-col items-end">
+                            <span className="text-xs font-bold text-red-600 bg-red-50 border border-red-100 px-2 py-0.5 rounded-lg mb-1">
+                              Depletes in {w.predicted_days_left} Days
+                            </span>
+                            <span className="text-[10px] font-semibold text-neutral-400 uppercase tracking-wider">
+                              Stock: {w.current_stock}
+                            </span>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -1617,20 +1755,176 @@ export default function AdminDashboard() {
           )}
 
 
-          {/* ==================== TAB: TEAM (Admin Only) ==================== */}
+          {/* ==================== TAB: EMPLOYEES (Admin Only) ==================== */}
           {activeTab === "team" && userRole === "admin" && (
             <div className="space-y-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-xl font-bold text-ink tracking-tight">Team Management</h2>
-                  <p className="text-sm text-neutral-500">Add, bulk-upload, and edit employees.</p>
+              {/* Bulk Results Modal */}
+              {bulkResults && (
+                <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-6 shadow-sm space-y-4 mb-6 relative">
+                  <button 
+                    onClick={() => setBulkResults(null)}
+                    className="absolute top-4 right-4 text-emerald-600 hover:text-emerald-800"
+                  >
+                    <XCircle size={20} />
+                  </button>
+                  <h3 className="text-sm font-bold uppercase tracking-widest text-emerald-800">
+                    Successfully Generated Employee Credentials
+                  </h3>
+                  <p className="text-xs text-emerald-700">Please copy these credentials and share them securely with the employees. Passwords cannot be viewed again later.</p>
+                  
+                  <div className="overflow-x-auto bg-white rounded-xl border border-emerald-100 shadow-sm max-h-96">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-emerald-50 border-b border-emerald-100">
+                        <tr>
+                          <th className="py-3 px-4 text-emerald-800 font-bold uppercase">Name</th>
+                          <th className="py-3 px-4 text-emerald-800 font-bold uppercase">Login ID (Username)</th>
+                          <th className="py-3 px-4 text-emerald-800 font-bold uppercase">Password</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-emerald-50">
+                        {bulkResults.map((emp, idx) => (
+                          <tr key={idx}>
+                            <td className="py-3 px-4 text-emerald-900 font-medium">{emp.name}</td>
+                            <td className="py-3 px-4 font-mono text-emerald-700 select-all">{emp.username}</td>
+                            <td className="py-3 px-4 font-mono text-emerald-700 select-all">{emp.password}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
+              )}
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                
+                {/* Employee Actions Sidebar */}
+                <div className="space-y-6 h-fit">
+                  {/* Bulk Upload */}
+                  <div className="bg-white border border-neutral-200/80 rounded-2xl p-6 shadow-sm space-y-4">
+                    <h3 className="text-xs font-bold uppercase tracking-widest text-neutral-400">Bulk Add (Excel)</h3>
+                    <p className="text-[10px] text-neutral-500">Upload an .xlsx file with a 'Name' column to auto-generate IDs and passwords.</p>
+                    <label className="w-full flex items-center justify-center gap-1.5 bg-white border border-neutral-200 text-neutral-600 hover:text-ink hover:border-neutral-300 text-xs font-bold uppercase tracking-wider px-4 py-3 rounded-xl transition-all shadow-sm cursor-pointer">
+                      <Download size={14} className="rotate-180" /> Upload Excel
+                      <input type="file" accept=".xlsx, .xls, .csv" className="hidden" onChange={handleBulkUpload} />
+                    </label>
+                  </div>
+
+                  {/* Create Manual User */}
+                  <div className="bg-white border border-neutral-200/80 rounded-2xl p-6 shadow-sm space-y-4">
+                    <h3 className="text-xs font-bold uppercase tracking-widest text-neutral-400">Add Employee Manually</h3>
+                    <form onSubmit={handleCreateUser} className="space-y-4">
+                      <div>
+                        <label className="block text-[10px] font-bold uppercase tracking-wider text-neutral-400 mb-1">Full Name</label>
+                        <input
+                          type="text"
+                          placeholder="Employee Name"
+                          className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-4 py-2.5 text-xs outline-none focus:border-ink"
+                          value={newName}
+                          onChange={(e) => setNewName(e.target.value)}
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-bold uppercase tracking-wider text-neutral-400 mb-1">Login Username</label>
+                        <input
+                          type="text"
+                          placeholder="aditya_fuzo"
+                          className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-4 py-2.5 text-xs outline-none focus:border-ink"
+                          value={newUsername}
+                          onChange={(e) => setNewUsername(e.target.value)}
+                          required
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-bold uppercase tracking-wider text-neutral-400 mb-1">Password</label>
+                        <input
+                          type="password"
+                          placeholder="••••••••"
+                          className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-4 py-2.5 text-xs outline-none focus:border-ink"
+                          value={newPassword}
+                          onChange={(e) => setNewPassword(e.target.value)}
+                          required
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-bold uppercase tracking-wider text-neutral-400 mb-1">Role Permission</label>
+                        <select
+                          className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-3 py-2.5 text-xs outline-none focus:border-ink font-semibold"
+                          value={newRole}
+                          onChange={(e) => setNewRole(e.target.value)}
+                        >
+                          <option value="employee">Employee (Inventory & Enquiries)</option>
+                          <option value="admin">Administrator (Full Access)</option>
+                        </select>
+                      </div>
+
+                      <button className="w-full bg-ink text-white hover:bg-neutral-800 text-xs font-bold uppercase tracking-wider py-3 rounded-xl transition-all shadow-sm flex items-center justify-center gap-1.5">
+                        <UserPlus size={14} /> Create Account
+                      </button>
+                    </form>
+                  </div>
+                </div>
+
+                {/* Users list / Spreadsheet view */}
+                <div className="md:col-span-2 bg-white border border-neutral-200/80 rounded-2xl overflow-hidden shadow-sm flex flex-col h-[700px]">
+                  <div className="p-6 border-b border-neutral-100 flex justify-between items-center bg-neutral-50/50">
+                    <h3 className="text-xs font-bold uppercase tracking-widest text-neutral-400">Employees Directory ({teamUsers.length})</h3>
+                  </div>
+                  
+                  <div className="flex-1 overflow-auto p-0">
+                    <table className="w-full text-left text-xs border-collapse">
+                      <thead className="bg-neutral-50/70 border-b border-neutral-200/60 text-[10px] font-bold uppercase tracking-widest text-neutral-400 sticky top-0 z-10">
+                        <tr>
+                          <th className="py-3 px-6">Name</th>
+                          <th className="py-3 px-6">Login ID</th>
+                          <th className="py-3 px-6">Role</th>
+                          <th className="py-3 px-6">Created</th>
+                          <th className="py-3 px-6 text-right">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-neutral-100">
+                        {teamUsers.map((user) => (
+                          <tr key={user.id} className="hover:bg-neutral-50/40 transition-colors">
+                            <td className="py-4 px-6 font-semibold text-neutral-800">{user.name || "—"}</td>
+                            <td className="py-4 px-6 font-mono font-medium text-neutral-600">{user.username}</td>
+                            <td className="py-4 px-6">
+                              <span 
+                                className={`text-[8px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border ${
+                                  user.role === "admin" 
+                                    ? "bg-purple-50 text-purple-600 border-purple-100" 
+                                    : "bg-blue-50 text-blue-600 border-blue-100"
+                                }`}
+                              >
+                                {user.role}
+                              </span>
+                            </td>
+                            <td className="py-4 px-6 text-neutral-500 font-medium">
+                              {new Date(user.created_at).toLocaleDateString("en-IN")}
+                            </td>
+                            <td className="py-4 px-6 text-right">
+                              {user.username !== currentUser ? (
+                                <button
+                                  onClick={() => handleDeleteUser(user.id)}
+                                  className="inline-flex items-center gap-1 bg-red-50 hover:bg-red-100 text-red-600 text-[10px] font-bold uppercase tracking-wider px-3 py-1.5 rounded-lg border border-red-100 transition-colors"
+                                >
+                                  <Trash2 size={11} /> Remove
+                                </button>
+                              ) : (
+                                <span className="text-[10px] font-bold text-emerald-500 uppercase tracking-widest bg-emerald-50 border border-emerald-100 px-3 py-1.5 rounded-lg inline-block">
+                                  You
+                                </span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
               </div>
-              
-              <EmployeeGrid 
-                users={teamUsers} 
-                onRefresh={() => adminGetUsers().then(setTeamUsers)} 
-              />
             </div>
           )}
 

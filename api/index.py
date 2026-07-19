@@ -14,7 +14,7 @@ from fastapi.security import OAuth2PasswordBearer
 from pydantic import BaseModel, Field
 from sqlalchemy import (
     create_engine, Column, Integer, String, Float, Boolean,
-    ForeignKey, DateTime, text, func, JSON, inspect
+    ForeignKey, DateTime, text, func
 )
 from sqlalchemy.orm import declarative_base, sessionmaker, relationship, Session
 import jwt
@@ -82,10 +82,10 @@ class Setting(Base):
 class User(Base):
     __tablename__ = "users"
     id = Column(Integer, primary_key=True)
+    name = Column(String, nullable=True)
     username = Column(String, unique=True, nullable=False)
     password_hash = Column(String, nullable=False)
     role = Column(String, nullable=False, default="employee")  # "admin" or "employee"
-    extra_details = Column(JSON, default=dict)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
 
@@ -118,42 +118,27 @@ Base.metadata.create_all(bind=engine)
 
 def run_migrations_and_seed():
     db = SessionLocal()
-    
-    def run_stmt(stmt: str):
-        try:
-            db.execute(text(stmt))
-            db.commit()
-        except Exception as e:
-            db.rollback()
-            print(f"Migration statement failed: {stmt} -> {e}")
-
     try:
-        inspector = inspect(engine)
-        
         # Check categories table columns
-        if inspector.has_table("categories"):
-            cols = [col['name'] for col in inspector.get_columns('categories')]
-            if "image_url" not in cols:
-                run_stmt("ALTER TABLE categories ADD COLUMN image_url VARCHAR DEFAULT ''")
-            if "subcategories" not in cols:
-                run_stmt("ALTER TABLE categories ADD COLUMN subcategories VARCHAR DEFAULT ''")
-            if "is_featured" not in cols:
-                # Boolean in Postgres vs SQLite might have different defaults, but 1/true is usually fine or we just add it
-                run_stmt("ALTER TABLE categories ADD COLUMN is_featured BOOLEAN DEFAULT true")
+        cols = [r[1] for r in db.execute(text("PRAGMA table_info(categories)")).fetchall()]
+        if "image_url" not in cols:
+            db.execute(text("ALTER TABLE categories ADD COLUMN image_url VARCHAR DEFAULT ''"))
+        if "subcategories" not in cols:
+            db.execute(text("ALTER TABLE categories ADD COLUMN subcategories VARCHAR DEFAULT ''"))
+        if "is_featured" not in cols:
+            db.execute(text("ALTER TABLE categories ADD COLUMN is_featured BOOLEAN DEFAULT 1"))
 
         # Check products table columns
-        if inspector.has_table("products"):
-            prod_cols = [col['name'] for col in inspector.get_columns('products')]
-            if "subcategory" not in prod_cols:
-                run_stmt("ALTER TABLE products ADD COLUMN subcategory VARCHAR DEFAULT ''")
-            if "cost" not in prod_cols:
-                run_stmt("ALTER TABLE products ADD COLUMN cost FLOAT DEFAULT 0.0")
+        prod_cols = [r[1] for r in db.execute(text("PRAGMA table_info(products)")).fetchall()]
+        if "subcategory" not in prod_cols:
+            db.execute(text("ALTER TABLE products ADD COLUMN subcategory VARCHAR DEFAULT ''"))
+        if "cost" not in prod_cols:
+            db.execute(text("ALTER TABLE products ADD COLUMN cost FLOAT DEFAULT 0.0"))
 
         # Check users table columns
-        if inspector.has_table("users"):
-            user_cols = [col['name'] for col in inspector.get_columns('users')]
-            if "extra_details" not in user_cols:
-                run_stmt("ALTER TABLE users ADD COLUMN extra_details JSON")
+        user_cols = [r[1] for r in db.execute(text("PRAGMA table_info(users)")).fetchall()]
+        if "name" not in user_cols:
+            db.execute(text("ALTER TABLE users ADD COLUMN name VARCHAR"))
 
 
         # Seed default settings
@@ -342,25 +327,27 @@ class SettingsUpdatePayload(BaseModel):
 
 class UserOut(BaseModel):
     id: int
+    name: Optional[str] = None
     username: str
     role: str
-    extra_details: Optional[Dict[str, Any]] = {}
     created_at: datetime.datetime
     class Config:
         from_attributes = True
 
 
 class UserCreate(BaseModel):
+    name: Optional[str] = None
     username: str
     password: str
     role: str = "employee"
-    extra_details: Optional[Dict[str, Any]] = {}
 
-class UserUpdate(BaseModel):
-    username: Optional[str] = None
-    password: Optional[str] = None
-    role: Optional[str] = None
-    extra_details: Optional[Dict[str, Any]] = None
+class EmployeeBulkCreate(BaseModel):
+    names: List[str]
+
+class EmployeeBulkOut(BaseModel):
+    name: str
+    username: str
+    password: str
 
 
 class EnquiryIn(BaseModel):
@@ -947,7 +934,7 @@ def admin_list_products(db: Session = Depends(get_db), current_user=Depends(get_
 
 
 @app.post("/api/admin/products", response_model=ProductAdminOut)
-def admin_create_product(data: ProductIn, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
+def admin_create_product(data: ProductIn, db: Session = Depends(get_db), current_user=Depends(require_admin)):
     slug = slugify(data.name)
     base_slug, i = slug, 1
     while db.query(Product).filter(Product.slug == slug).first():
@@ -962,6 +949,12 @@ def admin_create_product(data: ProductIn, db: Session = Depends(get_db), current
 
 @app.put("/api/admin/products/{product_id}", response_model=ProductAdminOut)
 def admin_update_product(product_id: int, data: ProductUpdate, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
+    if current_user.role == "employee":
+        allowed_fields = {"is_visible"}
+        submitted_fields = set(data.dict(exclude_unset=True).keys())
+        if not submitted_fields.issubset(allowed_fields):
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "Employees can only toggle product visibility.")
+
     product = db.query(Product).filter(Product.id == product_id).first()
     if not product:
         raise HTTPException(404, "Product not found")
@@ -1035,31 +1028,40 @@ def admin_create_user(data: UserCreate, db: Session = Depends(get_db), current_u
     if db.query(User).filter(User.username == data.username).first():
         raise HTTPException(400, "Username already exists")
     hashed = bcrypt.hashpw(data.password.encode(), bcrypt.gensalt()).decode()
-    user = User(username=data.username, password_hash=hashed, role=data.role, extra_details=data.extra_details)
+    user = User(name=data.name, username=data.username, password_hash=hashed, role=data.role)
     db.add(user)
     db.commit()
     db.refresh(user)
     return user
 
 
-@app.put("/api/admin/users/{user_id}", response_model=UserOut)
-def admin_update_user(user_id: int, data: UserUpdate, db: Session = Depends(get_db), current_user=Depends(require_admin)):
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user:
-        raise HTTPException(404, "User not found")
-    
-    if data.username is not None:
-        user.username = data.username
-    if data.password is not None and data.password.strip():
-        user.password_hash = bcrypt.hashpw(data.password.encode(), bcrypt.gensalt()).decode()
-    if data.role is not None:
-        user.role = data.role
-    if data.extra_details is not None:
-        user.extra_details = data.extra_details
+@app.post("/api/admin/employees/bulk", response_model=List[EmployeeBulkOut])
+def admin_bulk_create_employees(data: EmployeeBulkCreate, db: Session = Depends(get_db), current_user=Depends(require_admin)):
+    import random
+    import string
+    results = []
+    for name in data.names:
+        base_username = slugify(name).replace("-", "")
+        if not base_username:
+            continue
+        username = base_username
+        i = 1
+        while db.query(User).filter(User.username == username).first():
+            username = f"{base_username}{i}"
+            i += 1
+            
+        raw_pass = "IFC" + "".join(random.choices(string.digits, k=4))
+        hashed = bcrypt.hashpw(raw_pass.encode(), bcrypt.gensalt()).decode()
+        user = User(name=name, username=username, password_hash=hashed, role="employee")
+        db.add(user)
         
+        results.append({
+            "name": name,
+            "username": username,
+            "password": raw_pass
+        })
     db.commit()
-    db.refresh(user)
-    return user
+    return results
 
 
 @app.delete("/api/admin/users/{user_id}")
@@ -1109,6 +1111,31 @@ def admin_get_analytics(db: Session = Depends(get_db), current_user=Depends(get_
             "count": count
         })
         
+    # Predictive Inventory Warnings (last 30 days)
+    thirty_days_ago = datetime.datetime.utcnow() - datetime.timedelta(days=30)
+    enquiries_last_30 = db.query(Enquiry.product_id, func.count(Enquiry.id)).filter(
+        Enquiry.created_at >= thirty_days_ago,
+        Enquiry.product_id != None
+    ).group_by(Enquiry.product_id).all()
+    
+    inventory_warnings = []
+    for product_id, eq_count in enquiries_last_30:
+        product = db.query(Product).filter(Product.id == product_id).first()
+        if product and product.quantity > 0:
+            daily_rate = eq_count / 30.0
+            if daily_rate > 0:
+                days_left = product.quantity / daily_rate
+                if days_left <= 14:
+                    inventory_warnings.append({
+                        "product_id": product.id,
+                        "name": product.name,
+                        "current_stock": product.quantity,
+                        "predicted_days_left": int(days_left),
+                        "daily_rate": round(daily_rate, 2)
+                    })
+    
+    inventory_warnings.sort(key=lambda x: x["predicted_days_left"])
+
     return {
         "total_products": total_products,
         "total_enquiries": total_enquiries,
@@ -1116,5 +1143,63 @@ def admin_get_analytics(db: Session = Depends(get_db), current_user=Depends(get_
         "total_stock_qty": int(total_stock_qty) if total_stock_qty else 0,
         "status_breakdown": status_breakdown,
         "categories_breakdown": categories_breakdown,
-        "enquiries_trend": enquiries_trend
+        "enquiries_trend": enquiries_trend,
+        "inventory_warnings": inventory_warnings
     }
+
+# --- Public: AI Gift Finder ---
+class GiftFinderQuery(BaseModel):
+    query: str
+
+class GiftFinderResult(BaseModel):
+    message: str
+    products: List[ProductOut]
+
+@app.post("/api/search/gift-finder", response_model=GiftFinderResult)
+def gift_finder(data: GiftFinderQuery, db: Session = Depends(get_db)):
+    query = data.query.lower()
+    
+    import re
+    # Extract numbers for max_price
+    prices = re.findall(r'(?:under|below|<)\s*(?:rs\.?|₹|inr)?\s*(\d+)', query)
+    max_price = int(prices[0]) if prices else None
+    
+    # Extract quantity
+    qty_matches = re.findall(r'(\d+)\s*(?:people|employees|team|units|kits)', query)
+    quantity = int(qty_matches[0]) if qty_matches else None
+    
+    q = db.query(Product).filter(Product.is_visible == True)
+    
+    if max_price:
+        q = q.filter(Product.price <= max_price)
+    if quantity:
+        q = q.filter(Product.quantity >= quantity)
+        
+    # Extract keywords (ignore common stop words and numbers)
+    stop_words = {"i", "need", "under", "below", "for", "a", "team", "of", "people", "employees", "kits", "rs", "inr", "the", "some", "any", "with"}
+    words = [w for w in re.findall(r'\b[a-z]+\b', query) if w not in stop_words]
+    
+    if words:
+        from sqlalchemy import or_
+        # We'll use OR across words to not be overly restrictive, or AND? 
+        # Using AND across words can be too strict for a simple heuristic.
+        # Let's use AND for each word across fields (must match somewhere).
+        for w in words:
+            q = q.filter(or_(Product.name.ilike(f"%{w}%"), Product.description.ilike(f"%{w}%"), Product.subcategory.ilike(f"%{w}%")))
+            
+    products = q.order_by(Product.price.desc()).limit(10).all()
+    
+    msg = "I found "
+    if not products:
+        msg = "I couldn't find exactly what you're looking for, but here are some popular items:"
+        products = db.query(Product).filter(Product.is_visible == True).limit(5).all()
+    else:
+        msg += f"{len(products)} options "
+        if max_price:
+            msg += f"under ₹{max_price} "
+        if quantity:
+            msg += f"with enough stock for {quantity} people."
+        else:
+            msg += "that match your criteria."
+            
+    return {"message": msg, "products": products}

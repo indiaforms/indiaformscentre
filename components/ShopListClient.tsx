@@ -10,8 +10,10 @@ import {
   SlidersHorizontal, 
   ArrowDownToLine, 
   RotateCcw,
-  Check
+  Check,
+  Sparkles
 } from "lucide-react";
+import AIGiftFinder from "./AIGiftFinder";
 
 type ShopListClientProps = {
   products: Product[];
@@ -25,6 +27,7 @@ export default function ShopListClient({
   initialCategory,
 }: ShopListClientProps) {
   // State variables for active filters
+  const [showAIFinder, setShowAIFinder] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategories, setSelectedCategories] = useState<string[]>(
     initialCategory ? [initialCategory] : []
@@ -185,19 +188,22 @@ export default function ShopListClient({
           </button>
         </div>
 
-        {/* 1. Search */}
-        <div className="space-y-2">
-          <label className="block text-[10px] font-bold uppercase tracking-wider text-neutral-400">Search Products</label>
-          <div className="relative">
-            <input 
-              type="text"
-              placeholder="Bottle, notebook, kit..."
-              className="w-full bg-neutral-50 dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-xl pl-9 pr-4 py-2 text-xs outline-none focus:border-primary transition-all text-ink"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-            <Search className="absolute left-3 top-2.5 text-neutral-400" size={13} />
-          </div>
+        {/* 1. AI Gift Finder Trigger (Replaced Search) */}
+        <div className="space-y-2 pb-2">
+          <label className="block text-[10px] font-bold uppercase tracking-wider text-neutral-400 mb-1">
+            Smart Search
+          </label>
+          <button 
+            onClick={() => setShowAIFinder(true)}
+            className="w-full relative flex items-center justify-between bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700 text-white rounded-xl px-4 py-3 text-xs font-bold shadow-md hover:shadow-lg transition-all group overflow-hidden"
+          >
+            <div className="absolute inset-0 bg-white/20 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700" />
+            <span className="flex items-center gap-2 relative z-10">
+              <Sparkles size={16} className="animate-pulse" />
+              Ask AI Gift Finder
+            </span>
+            <Search size={14} className="opacity-70 relative z-10" />
+          </button>
         </div>
 
         {/* 2. Categories Checkbox Facet */}
@@ -351,6 +357,8 @@ export default function ShopListClient({
           </div>
         )}
       </div>
+
+      <AIGiftFinder isOpen={showAIFinder} onClose={() => setShowAIFinder(false)} />
     </div>
   );
 }

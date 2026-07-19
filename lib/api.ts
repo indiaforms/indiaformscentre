@@ -27,9 +27,9 @@ export type Product = {
 
 export type User = {
   id: number;
+  name?: string;
   username: string;
   role: "admin" | "employee";
-  extra_details?: Record<string, any>;
   created_at: string;
 };
 
@@ -60,6 +60,14 @@ export type AnalyticsTrend = {
   count: number;
 };
 
+export type InventoryWarning = {
+  product_id: number;
+  name: string;
+  current_stock: number;
+  predicted_days_left: number;
+  daily_rate: number;
+};
+
 export type Analytics = {
   total_products: number;
   total_enquiries: number;
@@ -68,6 +76,7 @@ export type Analytics = {
   status_breakdown: Record<string, number>;
   categories_breakdown: Record<string, number>;
   enquiries_trend: AnalyticsTrend[];
+  inventory_warnings?: InventoryWarning[];
 };
 
 async function request(path: string, options: RequestInit = {}) {
@@ -95,6 +104,12 @@ export const getProducts = (category?: string): Promise<Product[]> =>
 export const getProduct = (slug: string): Promise<Product> => request(`/products/${slug}`);
 
 export const getCategories = (): Promise<Category[]> => request("/categories");
+
+export const submitGiftFinderQuery = (query: string): Promise<{message: string, products: Product[]}> =>
+  request("/search/gift-finder", {
+    method: "POST",
+    body: JSON.stringify({ query }),
+  });
 
 export const submitEnquiry = (data: {
   name: string;
@@ -162,15 +177,9 @@ export const adminGetAnalytics = (): Promise<Analytics> => request("/admin/analy
 // Team Management (Admin Only)
 export const adminGetUsers = (): Promise<User[]> => request("/admin/users");
 
-export const adminCreateUser = (data: { username: string; password_hash?: string; password?: string; role: string; extra_details?: Record<string, any> }): Promise<User> =>
+export const adminCreateUser = (data: { name?: string; username: string; password_hash?: string; password?: string; role: string }): Promise<User> =>
   request("/admin/users", {
     method: "POST",
-    body: JSON.stringify(data),
-  });
-
-export const adminUpdateUser = (id: number, data: { username?: string; password?: string; role?: string; extra_details?: Record<string, any> }) =>
-  request(`/admin/users/${id}`, {
-    method: "PUT",
     body: JSON.stringify(data),
   });
 
