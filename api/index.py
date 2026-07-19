@@ -14,7 +14,7 @@ from fastapi.security import OAuth2PasswordBearer
 from pydantic import BaseModel, Field
 from sqlalchemy import (
     create_engine, Column, Integer, String, Float, Boolean,
-    ForeignKey, DateTime, text, func
+    ForeignKey, DateTime, text, func, JSON
 )
 from sqlalchemy.orm import declarative_base, sessionmaker, relationship, Session
 import jwt
@@ -85,6 +85,7 @@ class User(Base):
     username = Column(String, unique=True, nullable=False)
     password_hash = Column(String, nullable=False)
     role = Column(String, nullable=False, default="employee")  # "admin" or "employee"
+    extra_details = Column(JSON, default=dict)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
 
@@ -323,6 +324,7 @@ class UserOut(BaseModel):
     id: int
     username: str
     role: str
+    extra_details: Optional[Dict[str, Any]] = {}
     created_at: datetime.datetime
     class Config:
         from_attributes = True
@@ -332,6 +334,13 @@ class UserCreate(BaseModel):
     username: str
     password: str
     role: str = "employee"
+    extra_details: Optional[Dict[str, Any]] = {}
+
+class UserUpdate(BaseModel):
+    username: Optional[str] = None
+    password: Optional[str] = None
+    role: Optional[str] = None
+    extra_details: Optional[Dict[str, Any]] = None
 
 
 class EnquiryIn(BaseModel):
@@ -1006,8 +1015,28 @@ def admin_create_user(data: UserCreate, db: Session = Depends(get_db), current_u
     if db.query(User).filter(User.username == data.username).first():
         raise HTTPException(400, "Username already exists")
     hashed = bcrypt.hashpw(data.password.encode(), bcrypt.gensalt()).decode()
-    user = User(username=data.username, password_hash=hashed, role=data.role)
+    user = User(username=data.username, password_hash=hashed, role=data.role, extra_details=data.extra_details)
     db.add(user)
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+@app.put("/api/admin/users/{user_id}", response_model=UserOut)
+def admin_update_user(user_id: int, data: UserUpdate, db: Session = Depends(get_db), current_user=Depends(require_admin)):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(404, "User not found")
+    
+    if data.username is not None:
+        user.username = data.username
+    if data.password is not None and data.password.strip():
+        user.password_hash = bcrypt.hashpw(data.password.encode(), bcrypt.gensalt()).decode()
+    if data.role is not None:
+        user.role = data.role
+    if data.extra_details is not None:
+        user.extra_details = data.extra_details
+        
     db.commit()
     db.refresh(user)
     return user

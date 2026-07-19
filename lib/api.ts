@@ -29,6 +29,7 @@ export type User = {
   id: number;
   username: string;
   role: "admin" | "employee";
+  extra_details?: Record<string, any>;
   created_at: string;
 };
 
@@ -161,9 +162,15 @@ export const adminGetAnalytics = (): Promise<Analytics> => request("/admin/analy
 // Team Management (Admin Only)
 export const adminGetUsers = (): Promise<User[]> => request("/admin/users");
 
-export const adminCreateUser = (data: { username: string; password_hash?: string; password?: string; role: string }): Promise<User> =>
+export const adminCreateUser = (data: { username: string; password_hash?: string; password?: string; role: string; extra_details?: Record<string, any> }): Promise<User> =>
   request("/admin/users", {
     method: "POST",
+    body: JSON.stringify(data),
+  });
+
+export const adminUpdateUser = (id: number, data: { username?: string; password?: string; role?: string; extra_details?: Record<string, any> }) =>
+  request(`/admin/users/${id}`, {
+    method: "PUT",
     body: JSON.stringify(data),
   });
 

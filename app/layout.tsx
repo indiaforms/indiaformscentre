@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
-
+import PwaManager from "@/components/PwaManager";
 export const metadata: Metadata = {
   title: "India Forms Center | Premium Corporate Gifting & Branded Merchandise",
   description: "Design-led, high-utility corporate products customized for your brand identity. Explore our catalogue of premium executive gifts, onboarding kits, and branded merchandise.",
@@ -12,6 +12,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
+        <link rel="manifest" href="/manifest.json" />
+        <meta name="theme-color" content="#ffffff" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <script
@@ -34,6 +36,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body>
         {children}
+        <PwaManager />
         <Analytics />
       </body>
     </html>

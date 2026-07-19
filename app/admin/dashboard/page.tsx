@@ -1,4 +1,5 @@
 "use client";
+import EmployeeGrid from "@/components/EmployeeGrid";
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -123,11 +124,8 @@ export default function AdminDashboard() {
   const [editCategorySubcategories, setEditCategorySubcategories] = useState("");
   const [editCategoryIsFeatured, setEditCategoryIsFeatured] = useState(true);
   
-  // Team creation states
-  const [newUsername, setNewUsername] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [newRole, setNewRole] = useState("employee");
   
+
   // Search & Filter states
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
@@ -363,40 +361,6 @@ export default function AdminDashboard() {
       loadData();
     } catch (err: any) {
       setError(err.message || "Failed to update status.");
-    }
-  }
-
-  // Create Team User (Admin only)
-  async function handleCreateUser(e: React.FormEvent) {
-    e.preventDefault();
-    if (!newUsername.trim() || !newPassword.trim()) return;
-    clearAlerts();
-    try {
-      await adminCreateUser({
-        username: newUsername.trim(),
-        password: newPassword.trim(),
-        role: newRole,
-      });
-      setSuccess(`User Account for "${newUsername.trim()}" created successfully.`);
-      setNewUsername("");
-      setNewPassword("");
-      loadData();
-    } catch (err: any) {
-      setError(err.message || "Failed to create user account.");
-    }
-  }
-
-  // Delete Team User (Admin only)
-  async function handleDeleteUser(id: number) {
-    if (confirm("Delete this user account?")) {
-      clearAlerts();
-      try {
-        await adminDeleteUser(id);
-        setSuccess("User account removed.");
-        loadData();
-      } catch (err: any) {
-        setError(err.message || "Failed to delete user.");
-      }
     }
   }
 
@@ -1655,95 +1619,18 @@ export default function AdminDashboard() {
 
           {/* ==================== TAB: TEAM (Admin Only) ==================== */}
           {activeTab === "team" && userRole === "admin" && (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              
-              {/* Create User form */}
-              <div className="bg-white border border-neutral-200/80 rounded-2xl p-6 shadow-sm space-y-4 h-fit">
-                <h3 className="text-xs font-bold uppercase tracking-widest text-neutral-400">Add Team Member</h3>
-                <form onSubmit={handleCreateUser} className="space-y-4">
-                  <div>
-                    <label className="block text-[10px] font-bold uppercase tracking-wider text-neutral-400 mb-1">Username</label>
-                    <input
-                      type="text"
-                      placeholder="aditya_fuzo"
-                      className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-4 py-2.5 text-xs outline-none focus:border-ink"
-                      value={newUsername}
-                      onChange={(e) => setNewUsername(e.target.value)}
-                      required
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-[10px] font-bold uppercase tracking-wider text-neutral-400 mb-1">Password</label>
-                    <input
-                      type="password"
-                      placeholder="••••••••"
-                      className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-4 py-2.5 text-xs outline-none focus:border-ink"
-                      value={newPassword}
-                      onChange={(e) => setNewPassword(e.target.value)}
-                      required
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-[10px] font-bold uppercase tracking-wider text-neutral-400 mb-1">Role Permission</label>
-                    <select
-                      className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-3 py-2.5 text-xs outline-none focus:border-ink font-semibold"
-                      value={newRole}
-                      onChange={(e) => setNewRole(e.target.value)}
-                    >
-                      <option value="employee">Employee (Inventory & Enquiries)</option>
-                      <option value="admin">Administrator (Full Access)</option>
-                    </select>
-                  </div>
-
-                  <button className="w-full bg-ink text-white hover:bg-neutral-800 text-xs font-bold uppercase tracking-wider py-3 rounded-xl transition-all shadow-sm flex items-center justify-center gap-1.5">
-                    <UserPlus size={14} /> Create Account
-                  </button>
-                </form>
-              </div>
-
-              {/* Users list */}
-              <div className="md:col-span-2 bg-white border border-neutral-200/80 rounded-2xl p-6 shadow-sm space-y-4">
-                <h3 className="text-xs font-bold uppercase tracking-widest text-neutral-400">Team Users ({teamUsers.length})</h3>
-                <div className="divide-y divide-neutral-100 overflow-y-auto max-h-96">
-                  {teamUsers.map((user) => (
-                    <div key={user.id} className="py-3 flex items-center justify-between">
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-neutral-700">{user.username}</span>
-                          <span 
-                            className={`text-[8px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border ${
-                              user.role === "admin" 
-                                ? "bg-purple-50 text-purple-600 border-purple-100" 
-                                : "bg-neutral-50 text-neutral-500 border-neutral-200"
-                            }`}
-                          >
-                            {user.role}
-                          </span>
-                        </div>
-                        <span className="text-[10px] text-neutral-400 block">
-                          Created: {new Date(user.created_at).toLocaleString("en-IN", { dateStyle: "short" })}
-                        </span>
-                      </div>
-
-                      {user.username !== currentUser ? (
-                        <button
-                          onClick={() => handleDeleteUser(user.id)}
-                          className="bg-red-50 hover:bg-red-100 text-red-600 hover:text-red-700 text-[10px] font-bold uppercase tracking-wider px-3.5 py-1.5 rounded-lg border border-red-100 transition-colors flex items-center gap-1"
-                        >
-                          <Trash2 size={11} /> Remove
-                        </button>
-                      ) : (
-                        <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest bg-neutral-50 border border-neutral-100 px-3 py-1.5 rounded-lg">
-                          Active Account
-                        </span>
-                      )}
-                    </div>
-                  ))}
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-xl font-bold text-ink tracking-tight">Team Management</h2>
+                  <p className="text-sm text-neutral-500">Add, bulk-upload, and edit employees.</p>
                 </div>
               </div>
-
+              
+              <EmployeeGrid 
+                users={teamUsers} 
+                onRefresh={() => adminGetUsers().then(setTeamUsers)} 
+              />
             </div>
           )}
 

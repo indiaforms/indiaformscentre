@@ -177,35 +177,19 @@ export default function Navbar() {
 
             {!isLoggedIn && (
               <div className="hidden md:flex items-center gap-2">
-                {/* Employee Login Button */}
+                {/* Unified Portal Login Button */}
                 <Link
-                  href="/admin/login?role=employee"
-                  className={`group relative p-2.5 rounded-xl transition-all duration-300 ${
-                    scrolled || theme === "dark"
-                      ? "bg-white/10 hover:bg-white/20 border border-white/15 text-white hover:text-emerald-400"
-                      : "bg-black/5 hover:bg-black/10 border border-black/10 text-slate-700 hover:text-emerald-600"
-                  }`}
-                  aria-label="Employee Portal"
-                >
-                  <Briefcase size={14} />
-                  <span className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 scale-0 group-hover:scale-100 transition-all duration-200 bg-slate-900 text-white text-[9px] uppercase font-bold tracking-widest px-2.5 py-1 rounded-lg shadow-md whitespace-nowrap pointer-events-none">
-                    Employee Login
-                  </span>
-                </Link>
-
-                {/* Admin Login Button */}
-                <Link
-                  href="/admin/login?role=admin"
+                  href="/admin/login"
                   className={`group relative p-2.5 rounded-xl transition-all duration-300 ${
                     scrolled || theme === "dark"
                       ? "bg-white/10 hover:bg-white/20 border border-white/15 text-white hover:text-blue-400"
                       : "bg-black/5 hover:bg-black/10 border border-black/10 text-slate-700 hover:text-blue-600"
                   }`}
-                  aria-label="Admin Portal"
+                  aria-label="Portal Login"
                 >
                   <UserCog size={14} />
                   <span className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 scale-0 group-hover:scale-100 transition-all duration-200 bg-slate-900 text-white text-[9px] uppercase font-bold tracking-widest px-2.5 py-1 rounded-lg shadow-md whitespace-nowrap pointer-events-none">
-                    Admin Login
+                    Portal Login
                   </span>
                 </Link>
               </div>
