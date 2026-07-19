@@ -118,6 +118,15 @@ Base.metadata.create_all(bind=engine)
 
 def run_migrations_and_seed():
     db = SessionLocal()
+    
+    def run_stmt(stmt: str):
+        try:
+            db.execute(text(stmt))
+            db.commit()
+        except Exception as e:
+            db.rollback()
+            print(f"Migration statement failed: {stmt} -> {e}")
+
     try:
         inspector = inspect(engine)
         
@@ -125,26 +134,26 @@ def run_migrations_and_seed():
         if inspector.has_table("categories"):
             cols = [col['name'] for col in inspector.get_columns('categories')]
             if "image_url" not in cols:
-                db.execute(text("ALTER TABLE categories ADD COLUMN image_url VARCHAR DEFAULT ''"))
+                run_stmt("ALTER TABLE categories ADD COLUMN image_url VARCHAR DEFAULT ''")
             if "subcategories" not in cols:
-                db.execute(text("ALTER TABLE categories ADD COLUMN subcategories VARCHAR DEFAULT ''"))
+                run_stmt("ALTER TABLE categories ADD COLUMN subcategories VARCHAR DEFAULT ''")
             if "is_featured" not in cols:
                 # Boolean in Postgres vs SQLite might have different defaults, but 1/true is usually fine or we just add it
-                db.execute(text("ALTER TABLE categories ADD COLUMN is_featured BOOLEAN DEFAULT true"))
+                run_stmt("ALTER TABLE categories ADD COLUMN is_featured BOOLEAN DEFAULT true")
 
         # Check products table columns
         if inspector.has_table("products"):
             prod_cols = [col['name'] for col in inspector.get_columns('products')]
             if "subcategory" not in prod_cols:
-                db.execute(text("ALTER TABLE products ADD COLUMN subcategory VARCHAR DEFAULT ''"))
+                run_stmt("ALTER TABLE products ADD COLUMN subcategory VARCHAR DEFAULT ''")
             if "cost" not in prod_cols:
-                db.execute(text("ALTER TABLE products ADD COLUMN cost FLOAT DEFAULT 0.0"))
+                run_stmt("ALTER TABLE products ADD COLUMN cost FLOAT DEFAULT 0.0")
 
         # Check users table columns
         if inspector.has_table("users"):
             user_cols = [col['name'] for col in inspector.get_columns('users')]
             if "extra_details" not in user_cols:
-                db.execute(text("ALTER TABLE users ADD COLUMN extra_details JSON"))
+                run_stmt("ALTER TABLE users ADD COLUMN extra_details JSON")
 
 
         # Seed default settings
