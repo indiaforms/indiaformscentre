@@ -14,7 +14,7 @@ from fastapi.security import OAuth2PasswordBearer
 from pydantic import BaseModel, Field
 from sqlalchemy import (
     create_engine, Column, Integer, String, Float, Boolean,
-    ForeignKey, DateTime, text, func, JSON
+    ForeignKey, DateTime, text, func, JSON, inspect
 )
 from sqlalchemy.orm import declarative_base, sessionmaker, relationship, Session
 import jwt
@@ -119,21 +119,32 @@ Base.metadata.create_all(bind=engine)
 def run_migrations_and_seed():
     db = SessionLocal()
     try:
+        inspector = inspect(engine)
+        
         # Check categories table columns
-        cols = [r[1] for r in db.execute(text("PRAGMA table_info(categories)")).fetchall()]
-        if "image_url" not in cols:
-            db.execute(text("ALTER TABLE categories ADD COLUMN image_url VARCHAR DEFAULT ''"))
-        if "subcategories" not in cols:
-            db.execute(text("ALTER TABLE categories ADD COLUMN subcategories VARCHAR DEFAULT ''"))
-        if "is_featured" not in cols:
-            db.execute(text("ALTER TABLE categories ADD COLUMN is_featured BOOLEAN DEFAULT 1"))
+        if inspector.has_table("categories"):
+            cols = [col['name'] for col in inspector.get_columns('categories')]
+            if "image_url" not in cols:
+                db.execute(text("ALTER TABLE categories ADD COLUMN image_url VARCHAR DEFAULT ''"))
+            if "subcategories" not in cols:
+                db.execute(text("ALTER TABLE categories ADD COLUMN subcategories VARCHAR DEFAULT ''"))
+            if "is_featured" not in cols:
+                # Boolean in Postgres vs SQLite might have different defaults, but 1/true is usually fine or we just add it
+                db.execute(text("ALTER TABLE categories ADD COLUMN is_featured BOOLEAN DEFAULT true"))
 
         # Check products table columns
-        prod_cols = [r[1] for r in db.execute(text("PRAGMA table_info(products)")).fetchall()]
-        if "subcategory" not in prod_cols:
-            db.execute(text("ALTER TABLE products ADD COLUMN subcategory VARCHAR DEFAULT ''"))
-        if "cost" not in prod_cols:
-            db.execute(text("ALTER TABLE products ADD COLUMN cost FLOAT DEFAULT 0.0"))
+        if inspector.has_table("products"):
+            prod_cols = [col['name'] for col in inspector.get_columns('products')]
+            if "subcategory" not in prod_cols:
+                db.execute(text("ALTER TABLE products ADD COLUMN subcategory VARCHAR DEFAULT ''"))
+            if "cost" not in prod_cols:
+                db.execute(text("ALTER TABLE products ADD COLUMN cost FLOAT DEFAULT 0.0"))
+
+        # Check users table columns
+        if inspector.has_table("users"):
+            user_cols = [col['name'] for col in inspector.get_columns('users')]
+            if "extra_details" not in user_cols:
+                db.execute(text("ALTER TABLE users ADD COLUMN extra_details JSON"))
 
 
         # Seed default settings
