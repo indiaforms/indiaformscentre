@@ -121,26 +121,35 @@ def run_migrations_and_seed():
     try:
         inspector = inspect(engine)
 
+        # Helper function to run and commit single DDL statements
+        def add_column(table: str, statement: str):
+            try:
+                db.execute(text(statement))
+                db.commit()
+            except Exception as e:
+                db.rollback()
+                print(f"Skipping migration for {table}: {e}")
+
         # Check categories table columns
         cat_cols = [c['name'] for c in inspector.get_columns('categories')]
         if "image_url" not in cat_cols:
-            db.execute(text("ALTER TABLE categories ADD COLUMN image_url VARCHAR DEFAULT ''"))
+            add_column("categories", "ALTER TABLE categories ADD COLUMN image_url VARCHAR DEFAULT ''")
         if "subcategories" not in cat_cols:
-            db.execute(text("ALTER TABLE categories ADD COLUMN subcategories VARCHAR DEFAULT ''"))
+            add_column("categories", "ALTER TABLE categories ADD COLUMN subcategories VARCHAR DEFAULT ''")
         if "is_featured" not in cat_cols:
-            db.execute(text("ALTER TABLE categories ADD COLUMN is_featured BOOLEAN DEFAULT 1"))
+            add_column("categories", "ALTER TABLE categories ADD COLUMN is_featured BOOLEAN DEFAULT TRUE")
 
         # Check products table columns
         prod_cols = [c['name'] for c in inspector.get_columns('products')]
         if "subcategory" not in prod_cols:
-            db.execute(text("ALTER TABLE products ADD COLUMN subcategory VARCHAR DEFAULT ''"))
+            add_column("products", "ALTER TABLE products ADD COLUMN subcategory VARCHAR DEFAULT ''")
         if "cost" not in prod_cols:
-            db.execute(text("ALTER TABLE products ADD COLUMN cost FLOAT DEFAULT 0.0"))
+            add_column("products", "ALTER TABLE products ADD COLUMN cost FLOAT DEFAULT 0.0")
 
         # Check users table columns
         user_cols = [c['name'] for c in inspector.get_columns('users')]
         if "name" not in user_cols:
-            db.execute(text("ALTER TABLE users ADD COLUMN name VARCHAR"))
+            add_column("users", "ALTER TABLE users ADD COLUMN name VARCHAR")
 
 
         # Seed default settings
