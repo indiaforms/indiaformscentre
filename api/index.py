@@ -14,7 +14,7 @@ from fastapi.security import OAuth2PasswordBearer
 from pydantic import BaseModel, Field
 from sqlalchemy import (
     create_engine, Column, Integer, String, Float, Boolean,
-    ForeignKey, DateTime, text, func
+    ForeignKey, DateTime, text, func, inspect
 )
 from sqlalchemy.orm import declarative_base, sessionmaker, relationship, Session
 import jwt
@@ -119,24 +119,26 @@ Base.metadata.create_all(bind=engine)
 def run_migrations_and_seed():
     db = SessionLocal()
     try:
+        inspector = inspect(engine)
+
         # Check categories table columns
-        cols = [r[1] for r in db.execute(text("PRAGMA table_info(categories)")).fetchall()]
-        if "image_url" not in cols:
+        cat_cols = [c['name'] for c in inspector.get_columns('categories')]
+        if "image_url" not in cat_cols:
             db.execute(text("ALTER TABLE categories ADD COLUMN image_url VARCHAR DEFAULT ''"))
-        if "subcategories" not in cols:
+        if "subcategories" not in cat_cols:
             db.execute(text("ALTER TABLE categories ADD COLUMN subcategories VARCHAR DEFAULT ''"))
-        if "is_featured" not in cols:
+        if "is_featured" not in cat_cols:
             db.execute(text("ALTER TABLE categories ADD COLUMN is_featured BOOLEAN DEFAULT 1"))
 
         # Check products table columns
-        prod_cols = [r[1] for r in db.execute(text("PRAGMA table_info(products)")).fetchall()]
+        prod_cols = [c['name'] for c in inspector.get_columns('products')]
         if "subcategory" not in prod_cols:
             db.execute(text("ALTER TABLE products ADD COLUMN subcategory VARCHAR DEFAULT ''"))
         if "cost" not in prod_cols:
             db.execute(text("ALTER TABLE products ADD COLUMN cost FLOAT DEFAULT 0.0"))
 
         # Check users table columns
-        user_cols = [r[1] for r in db.execute(text("PRAGMA table_info(users)")).fetchall()]
+        user_cols = [c['name'] for c in inspector.get_columns('users')]
         if "name" not in user_cols:
             db.execute(text("ALTER TABLE users ADD COLUMN name VARCHAR"))
 
