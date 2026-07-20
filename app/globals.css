@@ -222,15 +222,25 @@ h1, h2, h3, h4, h5, h6 {
 
 .btn-outline {
   @apply inline-flex items-center justify-center gap-2 font-semibold text-sm tracking-wide uppercase px-7 py-3.5 rounded-full transition-all duration-300;
+  border: 1px solid rgba(15,23,42,0.20);
+  color: #0f172a;
+  background: rgba(15,23,42,0.05);
+  backdrop-filter: blur(8px);
+}
+.dark .btn-outline {
   border: 1px solid rgba(255,255,255,0.25);
   color: white;
   background: rgba(255,255,255,0.05);
-  backdrop-filter: blur(8px);
 }
 .btn-outline:hover {
+  background: rgba(15,23,42,0.10);
+  border-color: rgba(15,23,42,0.35);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+}
+.dark .btn-outline:hover {
   background: rgba(255,255,255,0.12);
   border-color: rgba(255,255,255,0.45);
-  transform: translateY(-2px);
   box-shadow: 0 8px 24px rgba(0,0,0,0.2);
 }
 

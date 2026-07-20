@@ -74,7 +74,7 @@ export default function Navbar() {
             : "bg-transparent"
         }`}
       >
-        <nav className="container-px max-w-7xl mx-auto h-20 flex items-center justify-between">
+        <nav className="container-px max-w-screen-xl mx-auto h-16 flex items-center justify-between gap-4">
           {/* Logo */}
           <Link href="/" className="group flex items-center gap-3">
             <div
@@ -99,7 +99,7 @@ export default function Navbar() {
           </Link>
 
           {/* Desktop Nav */}
-          <div className="hidden md:flex items-center gap-6 lg:gap-8">
+          <div className="hidden lg:flex items-center gap-5 shrink-0">
             <Link 
               href="/" 
               className="relative text-xs font-bold tracking-[0.15em] uppercase text-neutral-600 dark:text-neutral-300 hover:text-primary dark:hover:text-primary transition-colors group py-2"
@@ -149,38 +149,32 @@ export default function Navbar() {
           </div>
 
           {/* Right Actions */}
-          <div className="flex items-center gap-3">
-            
-            <PWAInstallPrompt />
+          <div className="flex items-center gap-2 shrink-0">
 
             {/* AI Gift Finder Trigger */}
             <button
               onClick={() => setShowAIFinder(true)}
-              className="hidden md:flex items-center gap-1.5 bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700 text-white text-[10px] font-black tracking-widest uppercase px-5.5 py-2.5 rounded-full transition-all duration-300 shadow-md shadow-indigo-500/20 hover:scale-102 hover:shadow-lg relative overflow-hidden group"
+              className="hidden lg:flex items-center gap-1 bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700 text-white text-[9px] font-black tracking-widest uppercase px-3 py-2 rounded-full transition-all duration-300 shadow-md shadow-indigo-500/20 hover:shadow-lg relative overflow-hidden group whitespace-nowrap"
             >
               <div className="absolute inset-0 bg-white/20 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700" />
-              <Sparkles size={13} className="animate-pulse relative z-10" />
-              <span className="relative z-10">AI Gift Finder</span>
+              <Sparkles size={11} className="animate-pulse relative z-10" />
+              <span className="relative z-10">AI Finder</span>
             </button>
 
-            {/* Download Catalogue button (red Fuzo style) */}
+            {/* Download Catalogue button */}
             <a
               href={catalogueUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="hidden lg:flex items-center gap-1.5 bg-[#e11d48] hover:bg-[#be123c] text-white text-[10px] font-black tracking-widest uppercase px-5.5 py-2.5 rounded-full transition-all duration-300 shadow-md shadow-red-500/10 hover:scale-102 hover:shadow-lg"
+              className="hidden xl:flex items-center gap-1 bg-[#e11d48] hover:bg-[#be123c] text-white text-[9px] font-black tracking-widest uppercase px-3 py-2 rounded-full transition-all duration-300 shadow-md shadow-red-500/10 hover:shadow-lg whitespace-nowrap"
             >
-              <ArrowDownToLine size={13} />
-              <span>Download Catalogue</span>
+              <ArrowDownToLine size={11} />
+              <span>Catalogue</span>
             </a>
 
             <button
               onClick={toggleTheme}
-              className={`relative p-2.5 rounded-xl transition-all duration-300 overflow-hidden ${
-                scrolled || theme === "dark"
-                  ? "bg-white/10 hover:bg-white/20 border border-white/15 text-white"
-                  : "bg-black/5 hover:bg-black/10 border border-black/10 text-slate-700"
-              }`}
+              className="relative p-2 rounded-xl transition-all duration-300 overflow-hidden bg-black/8 hover:bg-black/15 border border-black/12 text-slate-700 dark:bg-white/10 dark:hover:bg-white/20 dark:border-white/15 dark:text-white"
               aria-label="Toggle theme"
             >
               <div className={`transition-all duration-300 ${theme === "dark" ? "rotate-0" : "rotate-180"}`}>
@@ -192,15 +186,11 @@ export default function Navbar() {
             </button>
 
             {!isLoggedIn && (
-              <div className="hidden md:flex items-center gap-2">
+              <div className="hidden lg:flex items-center gap-1.5">
                 {/* Employee Login Button */}
                 <Link
                   href="/admin/login?role=employee"
-                  className={`group relative p-2.5 rounded-xl transition-all duration-300 ${
-                    scrolled || theme === "dark"
-                      ? "bg-white/10 hover:bg-white/20 border border-white/15 text-white hover:text-emerald-400"
-                      : "bg-black/5 hover:bg-black/10 border border-black/10 text-slate-700 hover:text-emerald-600"
-                  }`}
+                  className="group relative p-2 rounded-xl transition-all duration-300 bg-black/8 hover:bg-black/15 border border-black/12 text-slate-700 hover:text-emerald-600 dark:bg-white/10 dark:hover:bg-white/20 dark:border-white/15 dark:text-white dark:hover:text-emerald-400"
                   aria-label="Employee Portal"
                 >
                   <Briefcase size={14} />
@@ -212,11 +202,7 @@ export default function Navbar() {
                 {/* Admin Login Button */}
                 <Link
                   href="/admin/login?role=admin"
-                  className={`group relative p-2.5 rounded-xl transition-all duration-300 ${
-                    scrolled || theme === "dark"
-                      ? "bg-white/10 hover:bg-white/20 border border-white/15 text-white hover:text-blue-400"
-                      : "bg-black/5 hover:bg-black/10 border border-black/10 text-slate-700 hover:text-blue-600"
-                  }`}
+                  className="group relative p-2 rounded-xl transition-all duration-300 bg-black/8 hover:bg-black/15 border border-black/12 text-slate-700 hover:text-blue-600 dark:bg-white/10 dark:hover:bg-white/20 dark:border-white/15 dark:text-white dark:hover:text-blue-400"
                   aria-label="Admin Portal"
                 >
                   <UserCog size={14} />
