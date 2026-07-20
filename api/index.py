@@ -154,8 +154,31 @@ def run_migrations_and_seed():
 
         # Seed default settings
         if not db.query(Setting).filter(Setting.key == "catalogue_url").first():
-            db.add(Setting(key="catalogue_url", value="/catalogue.pdf"))
-        
+            db.add(Setting(key="catalogue_url", value="/api/products/catalogue/pdf"))
+
+        # ── CRITICAL: Seed default admin user if none exists ──────────────
+        if not db.query(User).filter(User.role == "admin").first():
+            admin_user = os.environ.get("ADMIN_USERNAME", "admin")
+            admin_pass = os.environ.get("ADMIN_PASSWORD", "admin123")
+            hashed = bcrypt.hashpw(admin_pass.encode(), bcrypt.gensalt()).decode()
+            db.add(User(name="Administrator", username=admin_user, password_hash=hashed, role="admin"))
+            print(f"Seeded default admin user: {admin_user}")
+
+        # Seed default categories if none exist
+        if not db.query(Category).first():
+            default_cats = [
+                ("Lifestyle", "lifestyle"),
+                ("Travel", "travel"),
+                ("Office Essentials", "office-essentials"),
+                ("Gadgets", "gadgets"),
+                ("Eco Life", "eco-life"),
+            ]
+            for name, slug in default_cats:
+                db.add(Category(name=name, slug=slug))
+            print("Seeded default categories.")
+
+        db.commit()
+
         # Seed default category images if empty
         cats = db.query(Category).all()
         # Default placeholder/premium images for seeded categories:
@@ -166,28 +189,30 @@ def run_migrations_and_seed():
             "gadgets": "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=800&q=80",
             "eco-life": "https://images.unsplash.com/photo-1542601906990-b4d3fb778b09?auto=format&fit=crop&w=800&q=80"
         }
+        default_subcats = {
+            "lifestyle": "Drinkware, Games, Health & Fitness, Home & Living, Lamps & Lights, Work From Home, Others",
+            "travel": "Bag Zone, Leisure & Outdoors, Travel Essentials, Others",
+            "office-essentials": "Bags, Desktop Utilities, Gift Sets, Promotional Items, Stationery, Other",
+            "gadgets": "Computer Accessories, Desk Gadgets, Mobile Accessories, Music Players, Tech Accessories, Others",
+        }
+        changed = False
         for c in cats:
             if not c.image_url and c.slug in default_images:
                 c.image_url = default_images[c.slug]
-            # Default subcategories if empty
-            if not c.subcategories:
-                if c.slug == "lifestyle":
-                    c.subcategories = "Drinkware, Games, Health & Fitness, Home & Living, Lamps & Lights, Work From Home, Others"
-                elif c.slug == "travel":
-                    c.subcategories = "Bag Zone, Leisure & Outdoors, Travel Essentials, Others"
-                elif c.slug == "office-essentials":
-                    c.subcategories = "Bags, Desktop Utilities, Gift Sets, Promotional Items, Stationery, Other"
-                elif c.slug == "gadgets":
-                    c.subcategories = "Computer Accessories, Desk Gadgets, Mobile Accessories, Music Players, Tech Accessories, Others"
-        
-        db.commit()
+                changed = True
+            if not c.subcategories and c.slug in default_subcats:
+                c.subcategories = default_subcats[c.slug]
+                changed = True
+        if changed:
+            db.commit()
+
     except Exception as e:
         print("Migration and seed error:", e)
+        db.rollback()
     finally:
         db.close()
 
 run_migrations_and_seed()
-
 
 
 def get_db():
