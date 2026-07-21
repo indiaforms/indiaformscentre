@@ -281,3 +281,105 @@ h1, h2, h3, h4, h5, h6 {
   opacity: 1;
   transform: translateY(0);
 }
+
+/* ─── Dark Mode Global Overrides ────────────────────────────────────
+   These override hardcoded bg-white / bg-neutral-* Tailwind classes
+   throughout the admin dashboard and other pages in dark mode.
+   This avoids editing every single element individually.
+──────────────────────────────────────────────────────────────────── */
+
+/* Cards / Panels - bg-white becomes dark card color */
+.dark .bg-white {
+  background-color: var(--color-card) !important;
+  color: var(--color-text);
+}
+
+/* Subtle backgrounds - bg-neutral-50 becomes slightly lighter than card */
+.dark .bg-neutral-50 {
+  background-color: #111d35 !important;
+}
+.dark .bg-neutral-50\/70,
+.dark .bg-neutral-50\/50 {
+  background-color: rgba(17, 29, 53, 0.7) !important;
+}
+.dark .bg-neutral-50\/40 {
+  background-color: rgba(17, 29, 53, 0.4) !important;
+}
+.dark .bg-neutral-100 {
+  background-color: #162038 !important;
+}
+.dark .bg-neutral-100\/50 {
+  background-color: rgba(22, 32, 56, 0.5) !important;
+}
+
+/* Borders */
+.dark .border-neutral-100 {
+  border-color: var(--color-border) !important;
+}
+.dark .border-neutral-200 {
+  border-color: var(--color-border) !important;
+}
+.dark .border-neutral-200\/80 {
+  border-color: rgba(30, 45, 74, 0.8) !important;
+}
+.dark .border-neutral-200\/75 {
+  border-color: rgba(30, 45, 74, 0.75) !important;
+}
+.dark .border-neutral-200\/60 {
+  border-color: rgba(30, 45, 74, 0.6) !important;
+}
+.dark .border-neutral-200\/50 {
+  border-color: rgba(30, 45, 74, 0.5) !important;
+}
+.dark .border-indigo-100 {
+  border-color: rgba(99, 102, 241, 0.2) !important;
+}
+
+/* Text overrides */
+.dark .text-neutral-600 {
+  color: #94a3c4 !important;
+}
+.dark .text-neutral-500 {
+  color: #7a8baa !important;
+}
+.dark .text-neutral-400 {
+  color: #6b7a99 !important;
+}
+.dark .text-neutral-700 {
+  color: #b0bcda !important;
+}
+
+/* Input fields */
+.dark input,
+.dark textarea,
+.dark select {
+  background-color: #111d35 !important;
+  border-color: var(--color-border) !important;
+  color: var(--color-text) !important;
+}
+.dark input::placeholder,
+.dark textarea::placeholder {
+  color: #4a5a7a !important;
+}
+
+/* Table header rows */
+.dark thead tr,
+.dark .bg-neutral-50\/70 {
+  background-color: rgba(17, 29, 53, 0.8) !important;
+}
+
+/* Table hover rows */
+.dark .hover\:bg-neutral-50\/40:hover {
+  background-color: rgba(17, 29, 53, 0.4) !important;
+}
+.dark .hover\:bg-neutral-50:hover {
+  background-color: #111d35 !important;
+}
+.dark .hover\:bg-neutral-100:hover {
+  background-color: #162038 !important;
+}
+
+/* Divide colors */
+.dark .divide-neutral-100 > * + * {
+  border-color: var(--color-border) !important;
+}
