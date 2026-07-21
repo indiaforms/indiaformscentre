@@ -204,6 +204,52 @@ export default function AdminDashboard() {
     setSuccess("");
   }
 
+  // Handle Client-Side Image Upload & Compression
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      setError("Please select a valid image file.");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        const MAX_WIDTH = 800;
+        const MAX_HEIGHT = 800;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > MAX_WIDTH) {
+            height *= MAX_WIDTH / width;
+            width = MAX_WIDTH;
+          }
+        } else {
+          if (height > MAX_HEIGHT) {
+            width *= MAX_HEIGHT / height;
+            height = MAX_HEIGHT;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          const compressedDataUrl = canvas.toDataURL("image/jpeg", 0.75); // 75% quality JPEG
+          setForm(prev => ({ ...prev, image_url: compressedDataUrl }));
+        }
+      };
+      img.src = event.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  };
+
   // Handle Product Save (Add/Update)
   async function handleProductSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -1016,13 +1062,31 @@ export default function AdminDashboard() {
 
                     <div className="space-y-4">
                       <div>
-                        <label className="block text-[10px] font-bold uppercase tracking-wider text-neutral-400 mb-1">Image URL</label>
-                        <input
-                          className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-4 py-2.5 text-xs outline-none focus:border-ink"
-                          placeholder="https://images.unsplash.com/..."
-                          value={form.image_url}
-                          onChange={(e) => setForm({ ...form, image_url: e.target.value })}
-                        />
+                        <label className="block text-[10px] font-bold uppercase tracking-wider text-neutral-400 mb-1">Image (Upload or URL)</label>
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            className="flex-1 bg-neutral-50 border border-neutral-200 rounded-xl px-4 py-2.5 text-xs outline-none focus:border-ink"
+                            placeholder="https://... or paste URL"
+                            value={form.image_url}
+                            onChange={(e) => setForm({ ...form, image_url: e.target.value })}
+                          />
+                          <label className="cursor-pointer flex items-center justify-center bg-white border border-neutral-200 text-neutral-600 hover:text-ink hover:border-neutral-300 px-4 py-2.5 rounded-xl transition-all shadow-sm text-xs font-bold uppercase tracking-wider flex-shrink-0">
+                            <ImageIcon size={14} className="mr-2" />
+                            Upload
+                            <input 
+                              type="file" 
+                              accept="image/*" 
+                              className="hidden" 
+                              onChange={handleImageUpload}
+                            />
+                          </label>
+                        </div>
+                        {form.image_url && form.image_url.startsWith('data:image') && (
+                          <p className="mt-1.5 text-[10px] text-emerald-600 font-semibold flex items-center gap-1">
+                            <CheckCircle size={10} /> Image uploaded & compressed successfully.
+                          </p>
+                        )}
                       </div>
 
                       <div className="grid grid-cols-3 gap-4">
