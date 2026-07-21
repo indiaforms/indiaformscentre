@@ -164,6 +164,14 @@ def run_migrations_and_seed():
             db.add(User(name="Administrator", username=admin_user, password_hash=hashed, role="admin"))
             print(f"Seeded default admin user: {admin_user}")
 
+        # Seed default employee user if none exists
+        if not db.query(User).filter(User.role == "employee").first():
+            emp_user = "employee"
+            emp_pass = "employee123"
+            emp_hashed = bcrypt.hashpw(emp_pass.encode(), bcrypt.gensalt()).decode()
+            db.add(User(name="Staff Member", username=emp_user, password_hash=emp_hashed, role="employee"))
+            print(f"Seeded default employee user: {emp_user}")
+
         # Seed default categories if none exist
         if not db.query(Category).first():
             default_cats = [
