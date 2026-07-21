@@ -9,17 +9,17 @@ export default function ContactPage() {
     {
       icon: <Phone className="text-emerald-500 shrink-0" size={18} />,
       label: "Corporate Helpline",
-      value: "+91 98765 43210",
+      value: "+91 98312 02628",
     },
     {
       icon: <Mail className="text-blue-500 shrink-0" size={18} />,
       label: "Email Support",
-      value: "corporate@indiaformscenter.in",
+      value: "indiaforms@gmail.com",
     },
     {
       icon: <MapPin className="text-purple-500 shrink-0" size={18} />,
       label: "Central Office",
-      value: "Level 6, Tech Park Center, Mumbai",
+      value: "India Forms Centre Private Limited, 606, Lake Gardens, Near Lake gardens post office, Kolkata-700045",
     },
   ];
 

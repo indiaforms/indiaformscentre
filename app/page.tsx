@@ -298,9 +298,9 @@ export default async function HomePage() {
 
               <div className="space-y-4">
                 {[
-                  { label: "Corporate Helpline", value: "+91 98765 43210" },
-                  { label: "Email Us", value: "corporate@indiaformscenter.in" },
-                  { label: "Office", value: "Level 6, Tech Park Center, Mumbai" },
+                  { label: "Corporate Helpline", value: "+91 98312 02628" },
+                  { label: "Email Us", value: "indiaforms@gmail.com" },
+                  { label: "Office", value: "India Forms Centre Private Limited, 606, Lake Gardens, Near Lake gardens post office, Kolkata-700045" },
                 ].map((item, i) => (
                   <div key={i} className="flex items-start gap-4">
                     <CheckCircle2 size={16} className="text-emerald-400 mt-0.5 shrink-0" />
