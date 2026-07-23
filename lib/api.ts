@@ -30,6 +30,7 @@ export type User = {
   name?: string;
   username: string;
   role: "admin" | "employee";
+  plaintext_password?: string;
   created_at: string;
 };
 

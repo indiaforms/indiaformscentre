@@ -85,6 +85,7 @@ class User(Base):
     name = Column(String, nullable=True)
     username = Column(String, unique=True, nullable=False)
     password_hash = Column(String, nullable=False)
+    plaintext_password = Column(String, nullable=True)
     role = Column(String, nullable=False, default="employee")  # "admin" or "employee"
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
@@ -150,6 +151,8 @@ def run_migrations_and_seed():
         user_cols = [c['name'] for c in inspector.get_columns('users')]
         if "name" not in user_cols:
             add_column("users", "ALTER TABLE users ADD COLUMN name VARCHAR")
+        if "plaintext_password" not in user_cols:
+            add_column("users", "ALTER TABLE users ADD COLUMN plaintext_password VARCHAR")
 
 
         # Seed default settings
@@ -161,7 +164,7 @@ def run_migrations_and_seed():
             admin_user = os.environ.get("ADMIN_USERNAME", "admin")
             admin_pass = os.environ.get("ADMIN_PASSWORD", "admin123")
             hashed = bcrypt.hashpw(admin_pass.encode(), bcrypt.gensalt()).decode()
-            db.add(User(name="Administrator", username=admin_user, password_hash=hashed, role="admin"))
+            db.add(User(name="Administrator", username=admin_user, password_hash=hashed, plaintext_password=admin_pass, role="admin"))
             print(f"Seeded default admin user: {admin_user}")
 
         # Seed default employee user if none exists
@@ -169,7 +172,7 @@ def run_migrations_and_seed():
             emp_user = "employee"
             emp_pass = "employee123"
             emp_hashed = bcrypt.hashpw(emp_pass.encode(), bcrypt.gensalt()).decode()
-            db.add(User(name="Staff Member", username=emp_user, password_hash=emp_hashed, role="employee"))
+            db.add(User(name="Staff Member", username=emp_user, password_hash=emp_hashed, plaintext_password=emp_pass, role="employee"))
             print(f"Seeded default employee user: {emp_user}")
 
         # Seed default categories if none exist
@@ -374,6 +377,7 @@ class UserOut(BaseModel):
     name: Optional[str] = None
     username: str
     role: str
+    plaintext_password: Optional[str] = None
     created_at: datetime.datetime
     class Config:
         from_attributes = True
@@ -1072,7 +1076,7 @@ def admin_create_user(data: UserCreate, db: Session = Depends(get_db), current_u
     if db.query(User).filter(User.username == data.username).first():
         raise HTTPException(400, "Username already exists")
     hashed = bcrypt.hashpw(data.password.encode(), bcrypt.gensalt()).decode()
-    user = User(name=data.name, username=data.username, password_hash=hashed, role=data.role)
+    user = User(name=data.name, username=data.username, password_hash=hashed, plaintext_password=data.password, role=data.role)
     db.add(user)
     db.commit()
     db.refresh(user)
@@ -1096,7 +1100,7 @@ def admin_bulk_create_employees(data: EmployeeBulkCreate, db: Session = Depends(
             
         raw_pass = "IFC" + "".join(random.choices(string.digits, k=4))
         hashed = bcrypt.hashpw(raw_pass.encode(), bcrypt.gensalt()).decode()
-        user = User(name=name, username=username, password_hash=hashed, role="employee")
+        user = User(name=name, username=username, password_hash=hashed, plaintext_password=raw_pass, role="employee")
         db.add(user)
         
         results.append({

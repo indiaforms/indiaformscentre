@@ -55,7 +55,9 @@ import {
   Briefcase,
   Image as ImageIcon,
   Settings,
-  Sparkles
+  Sparkles,
+  Menu,
+  X
 } from "lucide-react";
 
 import PWAInstallPrompt from "@/components/PWAInstallPrompt";
@@ -90,6 +92,7 @@ export default function AdminDashboard() {
   
   // Tab states: 'overview' | 'inventory' | 'enquiries' | 'categories' | 'team'
   const [activeTab, setActiveTab] = useState<string>("overview");
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -648,6 +651,12 @@ export default function AdminDashboard() {
       <header className="bg-card border-b border-border sticky top-0 z-30 shadow-sm transition-colors duration-300">
         <div className="container-px max-w-7xl mx-auto h-20 flex items-center justify-between">
           <div className="flex items-center gap-3">
+            <button 
+              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+              className="lg:hidden p-2 -ml-2 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
+            >
+              {isSidebarOpen ? <X size={24} /> : <Menu size={24} />}
+            </button>
             <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-700 to-emerald-600 flex items-center justify-center text-white font-bold text-lg shadow-sm">
               <Briefcase size={16} />
             </div>
@@ -680,11 +689,18 @@ export default function AdminDashboard() {
         </div>
       </header>
 
-      <div className="flex-1 flex flex-col lg:flex-row container-px max-w-7xl mx-auto py-8 gap-8 w-full">
+      <div className="flex-1 flex flex-col lg:flex-row container-px max-w-7xl mx-auto py-8 gap-8 w-full relative">
                {/* Left Sidebar Navigation */}
-        <aside className="w-full lg:w-64 flex flex-row lg:flex-col gap-2 overflow-x-auto lg:overflow-x-visible pb-3 lg:pb-0 h-fit">
+        <div className={`fixed inset-0 z-40 bg-black/50 lg:hidden transition-opacity ${isSidebarOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`} onClick={() => setIsSidebarOpen(false)} />
+        <aside className={`fixed lg:static top-0 left-0 h-full lg:h-fit w-64 bg-cream dark:bg-[#060b18] lg:bg-transparent z-50 p-6 lg:p-0 flex flex-col gap-2 transform transition-transform duration-300 lg:transform-none ${isSidebarOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full lg:translate-x-0'}`}>
+          
+          <div className="flex items-center justify-between lg:hidden mb-6">
+            <h2 className="text-sm font-bold uppercase tracking-widest text-ink">Menu</h2>
+            <button onClick={() => setIsSidebarOpen(false)} className="p-2 text-neutral-500 hover:text-ink"><X size={20}/></button>
+          </div>
+
           <button
-            onClick={() => { setActiveTab("overview"); clearAlerts(); }}
+            onClick={() => { setActiveTab("overview"); clearAlerts(); setIsSidebarOpen(false); }}
             className={`flex items-center gap-2.5 px-5 py-3.5 rounded-xl text-xs font-bold uppercase tracking-wider whitespace-nowrap transition-all w-full text-left ${
               activeTab === "overview"
                 ? "bg-primary text-white shadow-md shadow-blue-500/10"
@@ -696,7 +712,7 @@ export default function AdminDashboard() {
           </button>
           
           <button
-            onClick={() => { setActiveTab("inventory"); clearAlerts(); }}
+            onClick={() => { setActiveTab("inventory"); clearAlerts(); setIsSidebarOpen(false); }}
             className={`flex items-center gap-2.5 px-5 py-3.5 rounded-xl text-xs font-bold uppercase tracking-wider whitespace-nowrap transition-all w-full text-left ${
               activeTab === "inventory"
                 ? "bg-primary text-white shadow-md shadow-blue-500/10"
@@ -708,7 +724,7 @@ export default function AdminDashboard() {
           </button>
           
           <button
-            onClick={() => { setActiveTab("enquiries"); clearAlerts(); }}
+            onClick={() => { setActiveTab("enquiries"); clearAlerts(); setIsSidebarOpen(false); }}
             className={`flex items-center gap-2.5 px-5 py-3.5 rounded-xl text-xs font-bold uppercase tracking-wider whitespace-nowrap transition-all w-full text-left relative ${
               activeTab === "enquiries"
                 ? "bg-primary text-white shadow-md shadow-blue-500/10"
@@ -724,7 +740,7 @@ export default function AdminDashboard() {
             )}
           </button>
           <button
-            onClick={() => { setActiveTab("categories"); clearAlerts(); }}
+            onClick={() => { setActiveTab("categories"); clearAlerts(); setIsSidebarOpen(false); }}
             className={`flex items-center gap-2.5 px-5 py-3.5 rounded-xl text-xs font-bold uppercase tracking-wider whitespace-nowrap transition-all w-full text-left ${
               activeTab === "categories"
                 ? "bg-primary text-white shadow-md shadow-blue-500/10"
@@ -737,7 +753,7 @@ export default function AdminDashboard() {
 
 
           <button
-            onClick={() => { setActiveTab("settings"); clearAlerts(); }}
+            onClick={() => { setActiveTab("settings"); clearAlerts(); setIsSidebarOpen(false); }}
             className={`flex items-center gap-2.5 px-5 py-3.5 rounded-xl text-xs font-bold uppercase tracking-wider whitespace-nowrap transition-all w-full text-left ${
               activeTab === "settings"
                 ? "bg-primary text-white shadow-md shadow-blue-500/10"
@@ -1943,6 +1959,7 @@ export default function AdminDashboard() {
                         <tr>
                           <th className="py-3 px-6">Name</th>
                           <th className="py-3 px-6">Login ID</th>
+                          <th className="py-3 px-6">Password</th>
                           <th className="py-3 px-6">Role</th>
                           <th className="py-3 px-6">Created</th>
                           <th className="py-3 px-6 text-right">Actions</th>
@@ -1953,6 +1970,7 @@ export default function AdminDashboard() {
                           <tr key={user.id} className="hover:bg-neutral-50/40 transition-colors">
                             <td className="py-4 px-6 font-semibold text-neutral-800">{user.name || "—"}</td>
                             <td className="py-4 px-6 font-mono font-medium text-neutral-600">{user.username}</td>
+                            <td className="py-4 px-6 font-mono font-medium text-neutral-600">{user.plaintext_password || "••••••••"}</td>
                             <td className="py-4 px-6">
                               <span 
                                 className={`text-[8px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border ${
